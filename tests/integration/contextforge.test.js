@@ -6,6 +6,7 @@ import { createContextForge } from "../../src/contextforge.js";
 import { recordSessionEvent } from "../../src/session/events.js";
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
+const repoRoot = path.resolve(".");
 
 test("Phase 1 can index, search, analyze impact, and resume", async () => {
   const forge = createContextForge(sampleRepo, { sessionId: `test_session_${Date.now()}` });
@@ -39,6 +40,21 @@ test("Phase 1 can index, search, analyze impact, and resume", async () => {
     const why = forge.why("checkout timeout");
     assert.ok(why.seeds.length >= 1);
     assert.ok(why.session.length >= 1);
+  } finally {
+    forge.close();
+  }
+});
+
+test("ContextForge can index and understand the repository hosting itself", async () => {
+  const forge = createContextForge(repoRoot, { sessionId: `self_hosted_${Date.now()}` });
+  try {
+    const indexSummary = forge.indexRepository();
+    assert.ok(indexSummary.filesIndexed > 0);
+
+    const overview = forge.understand("go through every single file folder and subfolder in this whole project and explain what they are doing");
+    assert.ok(overview.topLevel.length > 0);
+    assert.ok(overview.importantFiles.length > 0);
+    assert.match(overview.summary, /Important files to read first/i);
   } finally {
     forge.close();
   }

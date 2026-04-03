@@ -9,6 +9,7 @@ test("classifyTask distinguishes trivial and complex prompts", () => {
   assert.equal(classifyTask("hi").label, "trivial");
   assert.equal(classifyTask("refactor the auth module and explain the root cause").label, "complex");
   assert.equal(classifyTask("why is checkout timing out and which files are likely involved?").label, "complex");
+  assert.equal(classifyTask("go through every single file folder and subfolder in this whole project and explain the architecture").label, "complex");
 });
 
 test("classifyContent detects code logs and dom snapshots", () => {

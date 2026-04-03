@@ -6,6 +6,20 @@ const TRIVIAL_PATTERNS = [
 const COMPLEX_HINTS = [
   "refactor",
   "architecture",
+  "project structure",
+  "whole project",
+  "entire project",
+  "entire repo",
+  "entire repository",
+  "full codebase",
+  "codebase exploration",
+  "comprehensive",
+  "all files",
+  "every file",
+  "every single file",
+  "folders",
+  "subfolders",
+  "packages",
   "why does",
   "why is",
   "which files",
@@ -41,6 +55,8 @@ export function classifyTask(message) {
   if (/\bwhy\b/.test(lowered)) complexityScore += 1;
   if (/\bhow\b/.test(lowered)) complexityScore += 0.5;
   if (/\bexplain\b/.test(lowered)) complexityScore += 1;
+  if (/\bunderstand\b/.test(lowered)) complexityScore += 1;
+  if (/\boverview\b/.test(lowered)) complexityScore += 1;
   if (/\bimpact\b|\baffect\b|\bbreak\b/.test(lowered)) complexityScore += 1;
   if (/\bwhere\b|\bwhich\b/.test(lowered)) complexityScore += 0.5;
   if (text.length > 180) complexityScore += 1;

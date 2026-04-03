@@ -36,6 +36,7 @@ import { tokenize, unique } from "./utils/text.js";
 import { MODEL_METADATA } from "./storage/model-metadata.js";
 import { purgeOldSessionEvents } from "./session/retention.js";
 import { clearActiveSession } from "./session/runtime.js";
+import { readText } from "./utils/fs.js";
 
 const REPO_STATE_CACHE = new Map();
 const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
@@ -118,17 +119,18 @@ export class ContextForge {
       `);
 
       for (const file of files) {
-        const parsed = parseSource({
-          language: file.language,
-          filePath: file.absolutePath,
-          content: file.content
-        });
-
+        let parsed = null;
         let fileArtifacts;
         let parseStatus = "parsed";
         let parseError = null;
 
         try {
+          parsed = parseSource({
+            language: file.language,
+            filePath: file.absolutePath,
+            content: file.content
+          });
+
           if (parsed) {
             fileArtifacts = extractSymbols({
               repoId,
@@ -159,7 +161,7 @@ export class ContextForge {
             });
           }
         } catch (error) {
-          parseStatus = "error";
+          parseStatus = "fallback";
           parseError = error.message;
           fileArtifacts = createFallbackFileArtifacts({
             repoId,
@@ -484,6 +486,7 @@ export class ContextForge {
     return [
       "forge_tools",
       "forge_start",
+      "forge_understand",
       "forge_search",
       "forge_symbol",
       "forge_scope",
@@ -494,6 +497,57 @@ export class ContextForge {
       "forge_stats",
       "forge_doctor"
     ];
+  }
+
+  understand(query = "") {
+    const normalizedQuery = String(query ?? "").trim();
+    const state = this._loadRepoState();
+    const topLevel = this._summarizeTopLevel(state.files);
+    const rootFiles = state.files
+      .filter((file) => !file.relativePath.includes("/"))
+      .map((file) => file.relativePath)
+      .sort((left, right) => left.localeCompare(right));
+    const packageInfo = this._readPackageInfo();
+    const entrypoints = this._detectEntrypoints(state.files, packageInfo);
+    const architecture = this.scope(
+      normalizedQuery || "project architecture structure overview packages folders entrypoints",
+      "auto"
+    ).slice(0, 8);
+    const importantFiles = this._rankImportantFiles({
+      state,
+      query: normalizedQuery || "project structure architecture entrypoints important files",
+      packageInfo
+    }).slice(0, 10);
+    const summary = this._buildUnderstandSummary({
+      packageInfo,
+      topLevel,
+      rootFiles,
+      entrypoints,
+      importantFiles
+    });
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "understand",
+      payload: {
+        query: normalizedQuery,
+        topLevelCount: topLevel.length,
+        importantFileCount: importantFiles.length,
+        topEntrypoint: entrypoints[0]?.path ?? null
+      }
+    });
+
+    return {
+      query: normalizedQuery,
+      summary,
+      packageInfo,
+      rootFiles,
+      topLevel,
+      entrypoints,
+      architecture,
+      importantFiles
+    };
   }
 
   pageState(maxBudget = 1200) {
@@ -948,6 +1002,7 @@ export class ContextForge {
 
   _startupPreloadPlan(message, task) {
     const lowered = String(message ?? "").toLowerCase();
+    const broadExplore = /\b(project structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|packages|folders|subfolders|overview|understand)\b/.test(lowered);
     if (task.loadStrategy === "minimal") {
       return {
         name: "minimal_brief",
@@ -959,10 +1014,17 @@ export class ContextForge {
 
     if (task.loadStrategy === "light") {
       return {
-        name: "light_tool_bundle",
-        toolSchemas: ["forge_tools"],
+        name: broadExplore ? "light_understand_bundle" : "light_tool_bundle",
+        toolSchemas: [broadExplore ? "forge_understand" : "forge_tools"],
         toolBudget: 120,
-        preloads: lowered.includes("search") || lowered.includes("find")
+        preloads: broadExplore
+          ? [{
+              pageType: "overview_pack",
+              sourceItemType: "module",
+              sourceItemId: "repo_map",
+              sizeEstimate: 72
+            }]
+          : lowered.includes("search") || lowered.includes("find")
           ? [{
               pageType: "retrieval_pack",
               sourceItemType: "module",
@@ -975,8 +1037,8 @@ export class ContextForge {
 
     const needsSession = /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
     return {
-      name: needsSession ? "full_session_pack" : "full_repo_pack",
-      toolSchemas: ["forge_tools"],
+      name: needsSession ? "full_session_pack" : broadExplore ? "full_understand_pack" : "full_repo_pack",
+      toolSchemas: [broadExplore ? "forge_understand" : "forge_tools"],
       toolBudget: 108,
       preloads: needsSession
         ? [{
@@ -985,6 +1047,13 @@ export class ContextForge {
             sourceItemId: "session_hints",
             sizeEstimate: 72
           }]
+        : broadExplore
+          ? [{
+              pageType: "overview_pack",
+              sourceItemType: "module",
+              sourceItemId: "repo_map",
+              sizeEstimate: 84
+            }]
         : [{
             pageType: "retrieval_pack",
             sourceItemType: "module",
@@ -992,6 +1061,214 @@ export class ContextForge {
             sizeEstimate: 76
           }]
     };
+  }
+
+  _summarizeTopLevel(files) {
+    const groups = new Map();
+    for (const file of files) {
+      const [head] = file.relativePath.split("/");
+      const key = file.relativePath.includes("/") ? head : ".";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          name: key === "." ? "root" : key,
+          path: key === "." ? "." : key,
+          fileCount: 0,
+          languages: new Set(),
+          samples: []
+        });
+      }
+
+      const group = groups.get(key);
+      group.fileCount += 1;
+      if (file.language) {
+        group.languages.add(file.language);
+      }
+      if (group.samples.length < 4) {
+        group.samples.push(file.relativePath);
+      }
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        name: group.name,
+        path: group.path,
+        fileCount: group.fileCount,
+        languages: [...group.languages].sort(),
+        samples: group.samples
+      }))
+      .sort((left, right) => {
+        if (left.path === ".") return -1;
+        if (right.path === ".") return 1;
+        return right.fileCount - left.fileCount || left.path.localeCompare(right.path);
+      });
+  }
+
+  _readPackageInfo() {
+    const packagePath = path.join(this.rootDir, "package.json");
+    try {
+      const manifest = JSON.parse(readText(packagePath));
+      return {
+        name: manifest.name ?? null,
+        version: manifest.version ?? null,
+        type: manifest.type ?? null,
+        main: manifest.main ?? null,
+        module: manifest.module ?? null,
+        bin: typeof manifest.bin === "string"
+          ? { [manifest.name ?? "bin"]: manifest.bin }
+          : manifest.bin ?? {},
+        scripts: Object.keys(manifest.scripts ?? {}).sort(),
+        workspaces: Array.isArray(manifest.workspaces)
+          ? manifest.workspaces
+          : Array.isArray(manifest.workspaces?.packages)
+            ? manifest.workspaces.packages
+            : []
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _detectEntrypoints(files, packageInfo) {
+    const entries = [];
+    const seen = new Set();
+    const add = (pathValue, reason, score = 0) => {
+      if (!pathValue || seen.has(pathValue)) {
+        return;
+      }
+      const match = files.find((file) => file.relativePath === pathValue) ??
+        files.find((file) => file.relativePath.endsWith(`/${pathValue}`));
+      if (!match) {
+        return;
+      }
+
+      entries.push({
+        path: match.relativePath,
+        reason,
+        score
+      });
+      seen.add(match.relativePath);
+    };
+
+    if (packageInfo?.main) add(packageInfo.main, "package.main", 10);
+    if (packageInfo?.module) add(packageInfo.module, "package.module", 9);
+    for (const [name, target] of Object.entries(packageInfo?.bin ?? {})) {
+      add(target, `package.bin:${name}`, 10);
+    }
+
+    for (const file of files) {
+      const basename = path.basename(file.relativePath).toLowerCase();
+      if (/^(index|main|app|server|cli)\./.test(basename)) {
+        add(file.relativePath, "conventional_entrypoint", 6);
+      }
+      if (basename.includes("mcp-server")) {
+        add(file.relativePath, "mcp_server", 9);
+      }
+    }
+
+    return entries
+      .sort((left, right) => right.score - left.score || left.path.localeCompare(right.path))
+      .slice(0, 10);
+  }
+
+  _rankImportantFiles({ state, query, packageInfo }) {
+    const symbolCounts = new Map();
+    for (const symbol of state.symbols) {
+      symbolCounts.set(symbol.fileId, (symbolCounts.get(symbol.fileId) ?? 0) + 1);
+    }
+
+    const edgeCounts = new Map();
+    const symbolToFile = new Map(state.symbols.map((symbol) => [symbol.symbolId, symbol.fileId]));
+    for (const edge of state.edges) {
+      const fromFileId = symbolToFile.get(edge.fromSymbolId);
+      const toFileId = symbolToFile.get(edge.toSymbolId);
+      if (fromFileId) edgeCounts.set(fromFileId, (edgeCounts.get(fromFileId) ?? 0) + 1);
+      if (toFileId) edgeCounts.set(toFileId, (edgeCounts.get(toFileId) ?? 0) + 1);
+    }
+
+    const packageTargets = new Set([
+      packageInfo?.main,
+      packageInfo?.module,
+      ...Object.values(packageInfo?.bin ?? {})
+    ].filter(Boolean));
+
+    return state.files
+      .map((file) => {
+        const reasons = [];
+        let score = 0;
+        const basename = path.basename(file.relativePath).toLowerCase();
+        const tokens = new Set(tokenize(file.relativePath));
+        const queryTokens = tokenize(query);
+        const symbolCount = symbolCounts.get(file.fileId) ?? 0;
+        const edgeCount = edgeCounts.get(file.fileId) ?? 0;
+
+        for (const token of queryTokens) {
+          if ([...tokens].some((candidate) => candidate.includes(token) || token.includes(candidate))) {
+            score += 1.2;
+          }
+        }
+
+        if (!file.relativePath.includes("/")) {
+          score += 2;
+          reasons.push("root_file");
+        }
+        if (file.relativePath === "package.json") {
+          score += 10;
+          reasons.push("manifest");
+        }
+        if (/^readme(\.|$)/i.test(basename)) {
+          score += 8;
+          reasons.push("documentation");
+        }
+        if (/^install(\.|$)/i.test(basename)) {
+          score += 5;
+          reasons.push("setup_guide");
+        }
+        if (basename.includes("mcp-server")) {
+          score += 8;
+          reasons.push("mcp_entrypoint");
+        }
+        if (packageInfo?.name && basename.includes(packageInfo.name.toLowerCase())) {
+          score += 7;
+          reasons.push("core_named_module");
+        }
+        if (/^(index|main|app|server|cli)\./.test(basename)) {
+          score += 4;
+          reasons.push("entrypoint_name");
+        }
+        if (packageTargets.has(file.relativePath)) {
+          score += 9;
+          reasons.push("package_entrypoint");
+        }
+
+        score += symbolCount * 0.45;
+        score += edgeCount * 0.12;
+        if (symbolCount) reasons.push(`symbols:${symbolCount}`);
+        if (edgeCount) reasons.push(`graph_edges:${edgeCount}`);
+
+        return {
+          path: file.relativePath,
+          score: Number(score.toFixed(3)),
+          reasons: unique(reasons)
+        };
+      })
+      .sort((left, right) => right.score - left.score || left.path.localeCompare(right.path));
+  }
+
+  _buildUnderstandSummary({ packageInfo, topLevel, rootFiles, entrypoints, importantFiles }) {
+    const folderText = topLevel.slice(0, 6).map((item) => `${item.path} (${item.fileCount} files)`).join(", ");
+    const entryText = entrypoints.slice(0, 4).map((item) => item.path).join(", ");
+    const importantText = importantFiles.slice(0, 5).map((item) => item.path).join(", ");
+    const packageText = packageInfo?.name
+      ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
+      : "no package manifest detected";
+
+    return [
+      `Package: ${packageText}.`,
+      topLevel.length ? `Top-level layout: ${folderText}.` : "Top-level layout: no indexed files.",
+      entrypoints.length ? `Likely entrypoints: ${entryText}.` : null,
+      rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
+      importantFiles.length ? `Important files to read first: ${importantText}.` : null
+    ].filter(Boolean).join(" ");
   }
 
   _compactSessionPayload(payload) {

@@ -146,6 +146,10 @@ async function main(argv) {
       case "startup":
         console.log(JSON.stringify(forge.startup(query), null, 2));
         break;
+      case "understand":
+        forge.indexRepository();
+        console.log(JSON.stringify(forge.understand(query), null, 2));
+        break;
       case "compress": {
         const artifact = query;
         const metadataArg = rest[2];

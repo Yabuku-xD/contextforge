@@ -13,6 +13,7 @@ const additionalContext = `
 
   Tool preference:
   - forge_start: warm up ContextForge for non-trivial repo tasks
+  - forge_understand: first choice for broad prompts like "understand this project", "go through the repo", "all files", "folders", "packages", or "project structure"
   - forge_search: behavior and file lookup
   - forge_symbol: exact or fuzzy symbol lookup
   - forge_scope: architecture and project structure questions

@@ -18,6 +18,6 @@ test("claude plugin marketplace metadata is present and points at the versioned 
 
   assert.equal(mcp.mcpServers.contextforge.command, "npx");
   assert.equal(mcp.mcpServers.contextforge.args[0], "-y");
-  assert.equal(mcp.mcpServers.contextforge.args[1], "github:Yabuku-xD/contextforge#v0.1.4");
+  assert.equal(mcp.mcpServers.contextforge.args[1], "github:Yabuku-xD/contextforge#v0.1.5");
   assert.equal(mcp.mcpServers.contextforge.args[2], "mcp-stdio");
 });

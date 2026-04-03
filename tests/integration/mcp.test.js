@@ -21,6 +21,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
   try {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "forge_start"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_understand"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_search"));
 
     const startup = await client.callTool({
@@ -49,6 +50,15 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
       }
     });
     assert.ok(!scope.isError);
+
+    const understand = await client.callTool({
+      name: "forge_understand",
+      arguments: {
+        query: "understand this project structure and important files"
+      }
+    });
+    assert.ok(!understand.isError);
+    assert.match(understand.content[0].text, /important files/i);
   } finally {
     await client.close();
     await transport.close();
