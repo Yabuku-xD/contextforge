@@ -13,6 +13,7 @@ const additionalContext = `
 
   Tool preference:
   - forge_start: warm up ContextForge for non-trivial repo tasks
+  - forge_scan: fastest first-pass repo map for broad prompts about the whole project or monorepo
   - forge_understand: first choice for broad prompts like "understand this project", "understand the monorepo", "go through the repo", "every file, folder, and subfolder", "all files", "folders", "packages", or "project structure"
   - forge_search: behavior and file lookup
   - forge_symbol: exact or fuzzy symbol lookup

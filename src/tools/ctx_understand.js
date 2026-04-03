@@ -1,6 +1,6 @@
 export const ctxUnderstand = {
   name: "forge_understand",
-  description: "Broad repository understanding for prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, entrypoints, and the most important files to read first.",
+  description: "Broad repository understanding for prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, entrypoints, and the most important files to read first. Uses a fast inventory-first path before deeper indexing.",
   parameters: { query: "string?" },
   execute(forge, args = {}) {
     return forge.understand(args.query ?? "");

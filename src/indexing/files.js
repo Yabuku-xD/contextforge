@@ -24,3 +24,21 @@ export function loadRepositoryFiles(rootDir, repoId) {
     };
   });
 }
+
+export function loadRepositoryInventory(rootDir, repoId) {
+  return walkFiles(rootDir).map((filePath) => {
+    const relativePath = relativeTo(rootDir, filePath);
+    const language = detectLanguage(relativePath);
+    const origin = classifyFileOrigin(relativePath);
+    const fileId = makeId("file", relativePath);
+
+    return {
+      fileId,
+      repoId,
+      absolutePath: path.resolve(filePath),
+      relativePath,
+      language,
+      ...origin
+    };
+  });
+}

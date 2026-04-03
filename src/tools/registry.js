@@ -1,5 +1,6 @@
 import { ctxGetTool } from "./ctx_get_tool.js";
 import { ctxStartup } from "./ctx_startup.js";
+import { ctxScan } from "./ctx_scan.js";
 import { ctxUnderstand } from "./ctx_understand.js";
 import { ctxSearch } from "./ctx_search.js";
 import { ctxSymbol } from "./ctx_symbol.js";
@@ -14,6 +15,7 @@ import { ctxDoctor } from "./ctx_doctor.js";
 export const TOOL_REGISTRY = {
   ctx_get_tool: ctxGetTool,
   ctx_startup: ctxStartup,
+  ctx_scan: ctxScan,
   ctx_understand: ctxUnderstand,
   ctx_search: ctxSearch,
   ctx_symbol: ctxSymbol,

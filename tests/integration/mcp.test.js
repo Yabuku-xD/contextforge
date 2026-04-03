@@ -21,8 +21,16 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
   try {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "forge_start"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_scan"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_understand"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_search"));
+
+    const scan = await client.callTool({
+      name: "forge_scan",
+      arguments: {}
+    });
+    assert.ok(!scan.isError);
+    assert.match(scan.content[0].text, /important files/i);
 
     const startup = await client.callTool({
       name: "forge_start",

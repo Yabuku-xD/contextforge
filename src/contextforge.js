@@ -1,7 +1,7 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { openDatabase } from "./storage/db.js";
-import { loadRepositoryFiles } from "./indexing/files.js";
+import { loadRepositoryFiles, loadRepositoryInventory } from "./indexing/files.js";
 import { parseSource } from "./indexing/tree-sitter.js";
 import { extractSymbols } from "./indexing/symbols.js";
 import { createFallbackFileArtifacts } from "./indexing/parser-fallback.js";
@@ -51,6 +51,7 @@ export class ContextForge {
     this.startupBrief = options.startupBrief ?? "Use exact lookup. Load only what is needed. Fault in the rest.";
     this.repoFingerprint = null;
     this._repoState = null;
+    this._repoInventory = null;
     this._filePathById = null;
   }
 
@@ -486,6 +487,7 @@ export class ContextForge {
     return [
       "forge_tools",
       "forge_start",
+      "forge_scan",
       "forge_understand",
       "forge_search",
       "forge_symbol",
@@ -501,20 +503,22 @@ export class ContextForge {
 
   understand(query = "") {
     const normalizedQuery = String(query ?? "").trim();
-    const state = this._loadRepoState();
-    const topLevel = this._summarizeTopLevel(state.files);
-    const rootFiles = state.files
+    const inventory = this._loadRepoInventory();
+    const topLevel = this._summarizeTopLevel(inventory.files);
+    const rootFiles = inventory.files
       .filter((file) => !file.relativePath.includes("/"))
       .map((file) => file.relativePath)
       .sort((left, right) => left.localeCompare(right));
     const packageInfo = this._readPackageInfo();
-    const entrypoints = this._detectEntrypoints(state.files, packageInfo);
-    const architecture = this.scope(
-      normalizedQuery || "project architecture structure overview packages folders entrypoints",
-      "auto"
-    ).slice(0, 8);
+    const entrypoints = this._detectEntrypoints(inventory.files, packageInfo);
+    const architecture = this._summarizeArchitecture({
+      files: inventory.files,
+      topLevel,
+      packageInfo,
+      entrypoints
+    });
     const importantFiles = this._rankImportantFiles({
-      state,
+      files: inventory.files,
       query: normalizedQuery || "project structure architecture entrypoints important files",
       packageInfo
     }).slice(0, 10);
@@ -541,6 +545,7 @@ export class ContextForge {
     return {
       query: normalizedQuery,
       summary,
+      mode: "inventory_first",
       packageInfo,
       rootFiles,
       topLevel,
@@ -982,6 +987,7 @@ export class ContextForge {
 
   _invalidateRepoCaches() {
     this._repoState = null;
+    this._repoInventory = null;
     this._filePathById = null;
     for (const key of REPO_STATE_CACHE.keys()) {
       if (key.startsWith(`${this.repoId}:`)) {
@@ -1015,7 +1021,7 @@ export class ContextForge {
     if (task.loadStrategy === "light") {
       return {
         name: broadExplore ? "light_understand_bundle" : "light_tool_bundle",
-        toolSchemas: [broadExplore ? "forge_understand" : "forge_tools"],
+        toolSchemas: [broadExplore ? "forge_scan" : "forge_tools"],
         toolBudget: 120,
         preloads: broadExplore
           ? [{
@@ -1038,7 +1044,7 @@ export class ContextForge {
     const needsSession = /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
     return {
       name: needsSession ? "full_session_pack" : broadExplore ? "full_understand_pack" : "full_repo_pack",
-      toolSchemas: [broadExplore ? "forge_understand" : "forge_tools"],
+      toolSchemas: [broadExplore ? "forge_scan" : "forge_tools"],
       toolBudget: 108,
       preloads: needsSession
         ? [{
@@ -1101,6 +1107,16 @@ export class ContextForge {
         if (right.path === ".") return 1;
         return right.fileCount - left.fileCount || left.path.localeCompare(right.path);
       });
+  }
+
+  _loadRepoInventory() {
+    if (this._repoInventory) {
+      return this._repoInventory;
+    }
+
+    const files = loadRepositoryInventory(this.rootDir, this.repoId);
+    this._repoInventory = { files };
+    return this._repoInventory;
   }
 
   _readPackageInfo() {
@@ -1170,19 +1186,22 @@ export class ContextForge {
       .slice(0, 10);
   }
 
-  _rankImportantFiles({ state, query, packageInfo }) {
+  _rankImportantFiles({ files, query, packageInfo, state = null }) {
     const symbolCounts = new Map();
-    for (const symbol of state.symbols) {
-      symbolCounts.set(symbol.fileId, (symbolCounts.get(symbol.fileId) ?? 0) + 1);
-    }
-
     const edgeCounts = new Map();
-    const symbolToFile = new Map(state.symbols.map((symbol) => [symbol.symbolId, symbol.fileId]));
-    for (const edge of state.edges) {
-      const fromFileId = symbolToFile.get(edge.fromSymbolId);
-      const toFileId = symbolToFile.get(edge.toSymbolId);
-      if (fromFileId) edgeCounts.set(fromFileId, (edgeCounts.get(fromFileId) ?? 0) + 1);
-      if (toFileId) edgeCounts.set(toFileId, (edgeCounts.get(toFileId) ?? 0) + 1);
+
+    if (state) {
+      for (const symbol of state.symbols) {
+        symbolCounts.set(symbol.fileId, (symbolCounts.get(symbol.fileId) ?? 0) + 1);
+      }
+
+      const symbolToFile = new Map(state.symbols.map((symbol) => [symbol.symbolId, symbol.fileId]));
+      for (const edge of state.edges) {
+        const fromFileId = symbolToFile.get(edge.fromSymbolId);
+        const toFileId = symbolToFile.get(edge.toSymbolId);
+        if (fromFileId) edgeCounts.set(fromFileId, (edgeCounts.get(fromFileId) ?? 0) + 1);
+        if (toFileId) edgeCounts.set(toFileId, (edgeCounts.get(toFileId) ?? 0) + 1);
+      }
     }
 
     const packageTargets = new Set([
@@ -1191,7 +1210,7 @@ export class ContextForge {
       ...Object.values(packageInfo?.bin ?? {})
     ].filter(Boolean));
 
-    return state.files
+    return files
       .map((file) => {
         const reasons = [];
         let score = 0;
@@ -1223,9 +1242,21 @@ export class ContextForge {
           score += 5;
           reasons.push("setup_guide");
         }
+        if (/^(design|architecture|overview)(\.|$)/i.test(basename)) {
+          score += 4;
+          reasons.push("design_doc");
+        }
         if (basename.includes("mcp-server")) {
           score += 8;
           reasons.push("mcp_entrypoint");
+        }
+        if (file.relativePath.startsWith("src/")) {
+          score += 2.5;
+          reasons.push("source_code");
+        }
+        if (file.relativePath.startsWith("hooks/")) {
+          score += 2;
+          reasons.push("integration_hook");
         }
         if (packageInfo?.name && basename.includes(packageInfo.name.toLowerCase())) {
           score += 7;
@@ -1252,6 +1283,39 @@ export class ContextForge {
         };
       })
       .sort((left, right) => right.score - left.score || left.path.localeCompare(right.path));
+  }
+
+  _summarizeArchitecture({ files, topLevel, packageInfo, entrypoints }) {
+    const rootGroups = topLevel
+      .filter((item) => item.path !== ".")
+      .slice(0, 10)
+      .map((item) => ({
+        label: item.path,
+        score: item.fileCount,
+        summary: `${item.path}: ${guessFolderPurpose(item.path, item.languages)}`
+      }));
+
+    const entryGroups = entrypoints.slice(0, 4).map((item) => ({
+      label: item.path,
+      score: item.score,
+      summary: `${item.path}: likely entrypoint via ${item.reason}`
+    }));
+
+    const workspaceGroups = (packageInfo?.workspaces ?? []).slice(0, 6).map((pattern) => ({
+      label: pattern,
+      score: 4,
+      summary: `${pattern}: declared workspace/package area`
+    }));
+
+    const fallbackRoot = rootGroups.length
+      ? rootGroups
+      : [{
+          label: "root",
+          score: files.length,
+          summary: `root: ${files.length} files discovered`
+        }];
+
+    return [...entryGroups, ...workspaceGroups, ...fallbackRoot].slice(0, 12);
   }
 
   _buildUnderstandSummary({ packageInfo, topLevel, rootFiles, entrypoints, importantFiles }) {
@@ -1359,4 +1423,20 @@ function whyNodePriority(node) {
   }
 
   return priority;
+}
+
+function guessFolderPurpose(folderName, languages = []) {
+  const lowered = String(folderName ?? "").toLowerCase();
+  if (lowered === "src") return "primary application and library source code";
+  if (lowered === "tests" || lowered === "test") return "test coverage, fixtures, and validation flows";
+  if (lowered === "hooks") return "Claude Code integration hooks and routing guidance";
+  if (lowered === "benchmark" || lowered === "benchmarks") return "evaluation fixtures, comparison tracks, and release gates";
+  if (lowered === "scripts") return "automation scripts and maintenance tasks";
+  if (lowered === "docs" || lowered === "doc") return "documentation and reference material";
+  if (lowered === ".claude") return "Claude Code local integration metadata";
+  if (lowered === ".github") return "GitHub automation and repository workflows";
+  if (lowered === "examples" || lowered === "example") return "sample usage and starter projects";
+  if (languages.includes("markdown")) return "documentation-heavy area";
+  if (languages.includes("javascript") || languages.includes("typescript")) return "code-heavy module area";
+  return "project area grouped by responsibility";
 }

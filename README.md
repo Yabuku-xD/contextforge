@@ -5,7 +5,7 @@
 [![Docs](https://img.shields.io/badge/DOCS-README-4B5563?style=for-the-badge)](./README.md)
 [![Claude Code](https://img.shields.io/badge/CLAUDE%20CODE-MARKETPLACE-2563EB?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
 [![Context Layer](https://img.shields.io/badge/CATEGORY-CONTEXT%20LAYER-FACC15?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
-[![Release](https://img.shields.io/badge/RELEASE-v0.1.6-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
+[![Release](https://img.shields.io/badge/RELEASE-v0.1.7-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
 [![License](https://img.shields.io/badge/LICENSE-MIT-166534?style=for-the-badge)](./LICENSE)
 
 </div>
