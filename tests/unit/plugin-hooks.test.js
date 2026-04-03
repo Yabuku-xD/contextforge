@@ -19,6 +19,7 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_start/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_scan/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_understand/);
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_walk/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_scope/);
   assert.match(payload.hookSpecificOutput.additionalContext, /ContextForge/);
 });

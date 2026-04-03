@@ -150,6 +150,10 @@ async function main(argv) {
         forge.indexRepository();
         console.log(JSON.stringify(forge.understand(query), null, 2));
         break;
+      case "walk":
+        forge.indexRepository();
+        console.log(JSON.stringify(forge.walk(query), null, 2));
+        break;
       case "compress": {
         const artifact = query;
         const metadataArg = rest[2];

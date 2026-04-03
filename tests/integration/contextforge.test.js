@@ -54,9 +54,17 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     const overview = forge.understand("Understand the entire contextforge monorepo structure - every file, folder, and subfolder, and explain what they are doing.");
     assert.ok(overview.topLevel.length > 0);
     assert.ok(overview.importantFiles.length > 0);
-    assert.match(overview.summary, /Important files to read first/i);
-    assert.equal(overview.mode, "inventory_first");
-    assert.match(overview.guidance, /first-pass repository overview/i);
+    assert.match(overview.summary, /Important files to read first|representative files/i);
+    assert.match(overview.mode, /inventory_(first|walk)/);
+    assert.match(overview.guidance, /first-pass repository overview|deeper repository map/i);
+
+    const walk = forge.walk("Go through every single file, folder, and subfolder in this project and explain what each major area does.");
+    assert.equal(walk.mode, "inventory_walk");
+    assert.ok(walk.directorySections.length > 0);
+    assert.match(walk.guidance, /deeper repository map/i);
+
+    const routed = forge.understand("Go through every single file, folder, and subfolder in this project.");
+    assert.equal(routed.mode, "inventory_walk");
   } finally {
     forge.close();
   }

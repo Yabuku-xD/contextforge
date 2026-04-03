@@ -489,6 +489,7 @@ export class ContextForge {
       "forge_start",
       "forge_scan",
       "forge_understand",
+      "forge_walk",
       "forge_search",
       "forge_symbol",
       "forge_scope",
@@ -501,35 +502,18 @@ export class ContextForge {
     ];
   }
 
-  understand(query = "") {
+  scan(query = "") {
     const normalizedQuery = String(query ?? "").trim();
-    const inventory = this._loadRepoInventory();
-    const topLevel = this._summarizeTopLevel(inventory.files);
-    const rootFiles = inventory.files
-      .filter((file) => !file.relativePath.includes("/"))
-      .map((file) => file.relativePath)
-      .sort((left, right) => left.localeCompare(right));
-    const packageInfo = this._readPackageInfo();
-    const packages = this._discoverWorkspacePackages(inventory.files, packageInfo);
-    const entrypoints = this._detectEntrypoints(inventory.files, packageInfo);
-    const architecture = this._summarizeArchitecture({
-      files: inventory.files,
-      topLevel,
-      packageInfo,
-      entrypoints
+    const overview = this._buildInventoryOverview(normalizedQuery, {
+      fallbackQuery: "project structure architecture entrypoints important files"
     });
-    const importantFiles = this._rankImportantFiles({
-      files: inventory.files,
-      query: normalizedQuery || "project structure architecture entrypoints important files",
-      packageInfo
-    }).slice(0, 10);
     const summary = this._buildUnderstandSummary({
-      packageInfo,
-      packages,
-      topLevel,
-      rootFiles,
-      entrypoints,
-      importantFiles
+      packageInfo: overview.packageInfo,
+      packages: overview.packages,
+      topLevel: overview.topLevel,
+      rootFiles: overview.rootFiles,
+      entrypoints: overview.entrypoints,
+      importantFiles: overview.importantFiles
     });
 
     recordSessionEvent(this.db, {
@@ -538,10 +522,11 @@ export class ContextForge {
       eventType: "understand",
       payload: {
         query: normalizedQuery,
-        topLevelCount: topLevel.length,
-        packageCount: packages.length,
-        importantFileCount: importantFiles.length,
-        topEntrypoint: entrypoints[0]?.path ?? null
+        topLevelCount: overview.topLevel.length,
+        packageCount: overview.packages.length,
+        importantFileCount: overview.importantFiles.length,
+        topEntrypoint: overview.entrypoints[0]?.path ?? null,
+        routedMode: "inventory_first"
       }
     });
 
@@ -557,13 +542,89 @@ export class ContextForge {
         "entrypoints",
         "important_files"
       ],
-      packageInfo,
-      packages,
-      rootFiles,
-      topLevel,
-      entrypoints,
-      architecture,
-      importantFiles
+      packageInfo: overview.packageInfo,
+      packages: overview.packages,
+      rootFiles: overview.rootFiles,
+      topLevel: overview.topLevel,
+      entrypoints: overview.entrypoints,
+      architecture: overview.architecture,
+      importantFiles: overview.importantFiles
+    };
+  }
+
+  understand(query = "") {
+    const normalizedQuery = String(query ?? "").trim();
+    if (this._shouldUseInventoryWalk(normalizedQuery)) {
+      return this.walk(normalizedQuery);
+    }
+    return this.scan(normalizedQuery);
+  }
+
+  walk(query = "") {
+    const normalizedQuery = String(query ?? "").trim();
+    const overview = this._buildInventoryOverview(normalizedQuery, {
+      fallbackQuery: "project structure architecture packages directories responsibilities important files representative files"
+    });
+    const packageSections = this._buildPackageSections({
+      files: overview.files,
+      packages: overview.packages,
+      entrypoints: overview.entrypoints,
+      query: normalizedQuery,
+      packageInfo: overview.packageInfo
+    });
+    const directorySections = this._buildDirectorySections({
+      files: overview.files,
+      topLevel: overview.topLevel,
+      packages: overview.packages,
+      query: normalizedQuery,
+      packageInfo: overview.packageInfo
+    });
+    const summary = this._buildWalkSummary({
+      packageInfo: overview.packageInfo,
+      topLevel: overview.topLevel,
+      packageSections,
+      directorySections,
+      rootFiles: overview.rootFiles,
+      importantFiles: overview.importantFiles
+    });
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "walk",
+      payload: {
+        query: normalizedQuery,
+        topLevelCount: overview.topLevel.length,
+        packageCount: overview.packages.length,
+        packageSectionCount: packageSections.length,
+        directorySectionCount: directorySections.length,
+        routedMode: "inventory_walk"
+      }
+    });
+
+    return {
+      query: normalizedQuery,
+      summary,
+      mode: "inventory_walk",
+      guidance: "Use this as the deeper repository map before spawning subagents or manually reading many files. Answer from these sections first, then drill into specific files only if the user asks or a section is ambiguous.",
+      coverage: [
+        "top_level_structure",
+        "package_manifest",
+        "workspace_packages",
+        "directory_sections",
+        "representative_files",
+        "entrypoints",
+        "important_files"
+      ],
+      packageInfo: overview.packageInfo,
+      packages: overview.packages,
+      rootFiles: overview.rootFiles,
+      topLevel: overview.topLevel,
+      entrypoints: overview.entrypoints,
+      architecture: overview.architecture,
+      importantFiles: overview.importantFiles,
+      packageSections,
+      directorySections
     };
   }
 
@@ -1021,6 +1082,7 @@ export class ContextForge {
   _startupPreloadPlan(message, task) {
     const lowered = String(message ?? "").toLowerCase();
     const broadExplore = /\b(project structure|repo structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|monorepo|package|packages|folder|folders|subfolder|subfolders|directory|directories|overview|understand)\b/.test(lowered);
+    const deepExplore = /\b(every single file|every file|all files|all folders|all directories|subfolder|subfolders|walk the repo|walk the project|go through every|go through each|comprehensive understanding|entire monorepo)\b/.test(lowered);
     if (task.loadStrategy === "minimal") {
       return {
         name: "minimal_brief",
@@ -1033,7 +1095,7 @@ export class ContextForge {
     if (task.loadStrategy === "light") {
       return {
         name: broadExplore ? "light_understand_bundle" : "light_tool_bundle",
-        toolSchemas: [broadExplore ? "forge_scan" : "forge_tools"],
+        toolSchemas: [deepExplore ? "forge_walk" : broadExplore ? "forge_scan" : "forge_tools"],
         toolBudget: 120,
         preloads: broadExplore
           ? [{
@@ -1056,7 +1118,7 @@ export class ContextForge {
     const needsSession = /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
     return {
       name: needsSession ? "full_session_pack" : broadExplore ? "full_understand_pack" : "full_repo_pack",
-      toolSchemas: [broadExplore ? "forge_scan" : "forge_tools"],
+      toolSchemas: [deepExplore ? "forge_walk" : broadExplore ? "forge_scan" : "forge_tools"],
       toolBudget: 108,
       preloads: needsSession
         ? [{
@@ -1397,6 +1459,196 @@ export class ContextForge {
       entrypoints.length ? `Likely entrypoints: ${entryText}.` : null,
       rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
       importantFiles.length ? `Important files to read first: ${importantText}.` : null
+    ].filter(Boolean).join(" ");
+  }
+
+  _buildInventoryOverview(query, { fallbackQuery }) {
+    const normalizedQuery = String(query ?? "").trim();
+    const inventory = this._loadRepoInventory();
+    const topLevel = this._summarizeTopLevel(inventory.files);
+    const rootFiles = inventory.files
+      .filter((file) => !file.relativePath.includes("/"))
+      .map((file) => file.relativePath)
+      .sort((left, right) => left.localeCompare(right));
+    const packageInfo = this._readPackageInfo();
+    const packages = this._discoverWorkspacePackages(inventory.files, packageInfo);
+    const entrypoints = this._detectEntrypoints(inventory.files, packageInfo);
+    const architecture = this._summarizeArchitecture({
+      files: inventory.files,
+      topLevel,
+      packageInfo,
+      entrypoints
+    });
+    const importantFiles = this._rankImportantFiles({
+      files: inventory.files,
+      query: normalizedQuery || fallbackQuery,
+      packageInfo
+    }).slice(0, 10);
+
+    return {
+      query: normalizedQuery,
+      files: inventory.files,
+      topLevel,
+      rootFiles,
+      packageInfo,
+      packages,
+      entrypoints,
+      architecture,
+      importantFiles
+    };
+  }
+
+  _shouldUseInventoryWalk(query) {
+    const lowered = String(query ?? "").toLowerCase();
+    return /\b(every single file|every file|all files|all folders|all directories|every folder|every directory|subfolder|subfolders|drill into each package|comprehensive understanding|comprehensive repo|go through every|walk the repo|walk through the repo|walk the project|whole monorepo|entire monorepo)\b/.test(lowered);
+  }
+
+  _buildPackageSections({ files, packages, entrypoints, query, packageInfo }) {
+    return packages
+      .map((pkg) => {
+        const packageFiles = files.filter((file) => file.relativePath.startsWith(`${pkg.path}/`));
+        const packageTopLevel = this._summarizeTopLevel(packageFiles);
+        const representativeFiles = this._rankImportantFiles({
+          files: packageFiles,
+          query: query || `${pkg.name ?? pkg.path} package module purpose entrypoint`,
+          packageInfo
+        }).slice(0, 4);
+        const packageEntrypoints = entrypoints
+          .filter((entry) => entry.path.startsWith(`${pkg.path}/`))
+          .slice(0, 4);
+        const subdirectories = this._summarizeScopedSubdirectories(files, pkg.path, 5);
+        const languages = unique(packageFiles.map((file) => file.language).filter(Boolean)).sort();
+        const directFiles = packageFiles
+          .filter((file) => file.relativePath.slice(pkg.path.length + 1) && !file.relativePath.slice(pkg.path.length + 1).includes("/"))
+          .map((file) => file.relativePath)
+          .sort((left, right) => left.localeCompare(right))
+          .slice(0, 4);
+
+        return {
+          path: pkg.path,
+          name: pkg.name,
+          description: pkg.description,
+          purpose: pkg.description ?? guessFolderPurpose(path.basename(pkg.path), languages),
+          fileCount: packageFiles.length,
+          languages,
+          directFiles,
+          entrypoints: packageEntrypoints,
+          subdirectories,
+          representativeFiles,
+          topLevelSamples: packageTopLevel
+            .filter((item) => item.path !== ".")
+            .slice(0, 4)
+            .map((item) => ({
+              path: item.path,
+              fileCount: item.fileCount,
+              purpose: guessFolderPurpose(path.basename(item.path), item.languages)
+            }))
+        };
+      })
+      .sort((left, right) => right.fileCount - left.fileCount || left.path.localeCompare(right.path));
+  }
+
+  _buildDirectorySections({ files, topLevel, packages, query, packageInfo }) {
+    return topLevel
+      .filter((item) => item.path !== ".")
+      .map((item) => {
+        const directoryFiles = files.filter((file) => file.relativePath.startsWith(`${item.path}/`));
+        const representativeFiles = this._rankImportantFiles({
+          files: directoryFiles,
+          query: query || `${item.path} directory purpose representative files`,
+          packageInfo
+        }).slice(0, 4);
+        const workspacePackages = packages
+          .filter((pkg) => pkg.path.startsWith(`${item.path}/`))
+          .slice(0, 6)
+          .map((pkg) => ({
+            path: pkg.path,
+            name: pkg.name,
+            description: pkg.description
+          }));
+
+        return {
+          path: item.path,
+          purpose: guessFolderPurpose(path.basename(item.path), item.languages),
+          fileCount: item.fileCount,
+          languages: item.languages,
+          samples: item.samples,
+          workspacePackages,
+          subdirectories: this._summarizeScopedSubdirectories(files, item.path, 6),
+          representativeFiles
+        };
+      })
+      .sort((left, right) => right.fileCount - left.fileCount || left.path.localeCompare(right.path));
+  }
+
+  _summarizeScopedSubdirectories(files, basePath, limit = 5) {
+    const groups = new Map();
+    const prefix = `${basePath}/`;
+
+    for (const file of files) {
+      if (!file.relativePath.startsWith(prefix)) {
+        continue;
+      }
+
+      const remainder = file.relativePath.slice(prefix.length);
+      if (!remainder.includes("/")) {
+        continue;
+      }
+
+      const [head] = remainder.split("/");
+      const sectionPath = `${basePath}/${head}`;
+      if (!groups.has(sectionPath)) {
+        groups.set(sectionPath, {
+          path: sectionPath,
+          fileCount: 0,
+          languages: new Set(),
+          samples: []
+        });
+      }
+
+      const group = groups.get(sectionPath);
+      group.fileCount += 1;
+      if (file.language) {
+        group.languages.add(file.language);
+      }
+      if (group.samples.length < 3) {
+        group.samples.push(file.relativePath);
+      }
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        path: group.path,
+        fileCount: group.fileCount,
+        languages: [...group.languages].sort(),
+        purpose: guessFolderPurpose(path.basename(group.path), [...group.languages]),
+        samples: group.samples
+      }))
+      .sort((left, right) => right.fileCount - left.fileCount || left.path.localeCompare(right.path))
+      .slice(0, limit);
+  }
+
+  _buildWalkSummary({ packageInfo, topLevel, packageSections, directorySections, rootFiles, importantFiles }) {
+    const manifestText = packageInfo?.name
+      ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
+      : "no package manifest detected";
+    const topLevelText = topLevel.slice(0, 6).map((item) => `${item.path} (${item.fileCount} files)`).join(", ");
+    const packageText = packageSections.length
+      ? `Package walk covers ${packageSections.slice(0, 4).map((section) => section.name ?? section.path).join(", ")}${packageSections.length > 4 ? `, and ${packageSections.length - 4} more` : ""}.`
+      : null;
+    const directoryText = directorySections.length
+      ? `Top-level areas include ${directorySections.slice(0, 4).map((section) => section.path).join(", ")}${directorySections.length > 4 ? `, and ${directorySections.length - 4} more` : ""}.`
+      : null;
+    const importantText = importantFiles.slice(0, 5).map((item) => item.path).join(", ");
+
+    return [
+      `Package: ${manifestText}.`,
+      topLevel.length ? `Top-level layout: ${topLevelText}.` : "Top-level layout: no indexed files.",
+      packageText,
+      directoryText,
+      rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
+      importantFiles.length ? `Start with these representative files: ${importantText}.` : null,
+      "This pass summarizes each major area with representative files so you can answer broad repo questions without crawling every file body first."
     ].filter(Boolean).join(" ");
   }
 
