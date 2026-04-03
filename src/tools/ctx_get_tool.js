@@ -1,5 +1,5 @@
 export const ctxGetTool = {
-  name: "ctx_get_tool",
+  name: "forge_tools",
   description: "Returns ContextForge tool schemas or lists available tools.",
   parameters: {
     tool_name: "string | 'list'"

@@ -1,5 +1,5 @@
 export const ctxResume = {
-  name: "ctx_resume",
+  name: "forge_resume",
   description: "Build a compact resume summary for the current session.",
   parameters: {},
   execute(forge) {

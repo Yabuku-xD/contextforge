@@ -1,5 +1,5 @@
 export const ctxStartup = {
-  name: "ctx_startup",
+  name: "forge_start",
   description: "Warm ContextForge for the current task and establish session paging state.",
   parameters: { query: "string?" },
   execute(forge, args = {}) {

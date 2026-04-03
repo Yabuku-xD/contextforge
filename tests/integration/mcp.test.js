@@ -20,11 +20,11 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
 
   try {
     const tools = await client.listTools();
-    assert.ok(tools.tools.some((tool) => tool.name === "ctx_startup"));
-    assert.ok(tools.tools.some((tool) => tool.name === "ctx_search"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_start"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_search"));
 
     const startup = await client.callTool({
-      name: "ctx_startup",
+      name: "forge_start",
       arguments: {
         query: "why is checkout timing out and which files are likely involved?"
       }
@@ -32,7 +32,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(!startup.isError);
 
     const search = await client.callTool({
-      name: "ctx_search",
+      name: "forge_search",
       arguments: {
         query: "checkout timeout",
         limit: 3

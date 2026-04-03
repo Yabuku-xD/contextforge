@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-test("claude plugin marketplace metadata is present and points at the repo-local plugin", () => {
+test("claude plugin marketplace metadata is present and points at the versioned github launcher", () => {
   const marketplace = JSON.parse(fs.readFileSync(".claude-plugin/marketplace.json", "utf8"));
   const plugin = JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8"));
   const mcp = JSON.parse(fs.readFileSync(".mcp.json", "utf8"));
@@ -16,6 +16,8 @@ test("claude plugin marketplace metadata is present and points at the repo-local
   assert.equal(plugin.mcpServers, "./.mcp.json");
   assert.equal(plugin.license, "MIT");
 
-  assert.equal(mcp.mcpServers.contextforge.command, "node");
-  assert.ok(mcp.mcpServers.contextforge.args[0].includes("${CLAUDE_PLUGIN_ROOT}/src/mcp-server.js"));
+  assert.equal(mcp.mcpServers.contextforge.command, "npx");
+  assert.equal(mcp.mcpServers.contextforge.args[0], "-y");
+  assert.equal(mcp.mcpServers.contextforge.args[1], "github:Yabuku-xD/contextforge#v0.1.1");
+  assert.equal(mcp.mcpServers.contextforge.args[2], "contextforge-mcp");
 });

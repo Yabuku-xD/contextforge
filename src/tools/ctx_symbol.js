@@ -1,5 +1,5 @@
 export const ctxSymbol = {
-  name: "ctx_symbol",
+  name: "forge_symbol",
   description: "Exact and fuzzy symbol lookup.",
   parameters: { query: "string", limit: "number?" },
   execute(forge, args = {}) {

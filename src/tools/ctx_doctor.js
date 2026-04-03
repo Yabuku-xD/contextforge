@@ -1,5 +1,5 @@
 export const ctxDoctor = {
-  name: "ctx_doctor",
+  name: "forge_doctor",
   description: "Diagnose ContextForge installation and repository state.",
   parameters: {},
   execute(forge) {

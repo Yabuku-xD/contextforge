@@ -1,9 +1,11 @@
 {
   "mcpServers": {
     "contextforge": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.js"
+        "-y",
+        "github:Yabuku-xD/contextforge#v0.1.1",
+        "contextforge-mcp"
       ],
       "env": {
         "CONTEXTFORGE_USE_ACTIVE_SESSION": "1"

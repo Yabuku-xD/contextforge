@@ -1,5 +1,5 @@
 export const ctxSession = {
-  name: "ctx_session",
+  name: "forge_session",
   description: "Query the current session memory.",
   parameters: { query: "string?" },
   execute(forge, args = {}) {

@@ -1,5 +1,5 @@
 export const ctxSearch = {
-  name: "ctx_search",
+  name: "forge_search",
   description: "Hybrid code search across exact, BM25, dense, RAPTOR, and graph reranking.",
   parameters: { query: "string", limit: "number?" },
   execute(forge, args = {}) {

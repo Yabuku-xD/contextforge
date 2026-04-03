@@ -133,7 +133,7 @@ export async function runBenchmarks(rootDir) {
     }));
 
     const startupState = forge.startup("why is checkout timing out and which files are likely involved?");
-    const toolPage = startupState.pages.find((page) => page.sourceItemId === "ctx_get_tool");
+    const toolPage = startupState.pages.find((page) => page.sourceItemId === "forge_tools");
     const firstFault = toolPage ? forge.notePageFault(toolPage.pageId, "repeat_fault") : null;
     const secondFault = toolPage ? forge.notePageFault(toolPage.pageId, "repeat_fault") : null;
     const pager = {

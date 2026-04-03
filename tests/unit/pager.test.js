@@ -12,7 +12,7 @@ test("pager pins a page after repeated faults", () => {
     sessionId: "session_1",
     pageType: "tool_schema",
     sourceItemType: "tool",
-    sourceItemId: "ctx_get_tool",
+    sourceItemId: "forge_tools",
     sizeEstimate: 200
   });
 

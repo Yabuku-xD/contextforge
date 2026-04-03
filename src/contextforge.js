@@ -482,17 +482,17 @@ export class ContextForge {
 
   listTools() {
     return [
-      "ctx_get_tool",
-      "ctx_startup",
-      "ctx_search",
-      "ctx_symbol",
-      "ctx_scope",
-      "ctx_impact",
-      "ctx_why",
-      "ctx_session",
-      "ctx_resume",
-      "ctx_stats",
-      "ctx_doctor"
+      "forge_tools",
+      "forge_start",
+      "forge_search",
+      "forge_symbol",
+      "forge_scope",
+      "forge_impact",
+      "forge_why",
+      "forge_session",
+      "forge_resume",
+      "forge_stats",
+      "forge_doctor"
     ];
   }
 
@@ -859,7 +859,7 @@ export class ContextForge {
       failureFiles: unique(recentEvents.filter((event) => event.eventType === "failure").map((event) => event.payload?.filePath).filter(Boolean)),
       failureSymbols: unique(recentEvents.filter((event) => event.eventType === "failure").map((event) => event.payload?.symbolId).filter(Boolean)),
       hotTools: unique(recentEvents.flatMap((event) =>
-        event.eventType === "startup" && event.payload?.loadStrategy !== "minimal" ? ["ctx_get_tool"] : []))
+        event.eventType === "startup" && event.payload?.loadStrategy !== "minimal" ? ["forge_tools"] : []))
     };
   }
 
@@ -960,7 +960,7 @@ export class ContextForge {
     if (task.loadStrategy === "light") {
       return {
         name: "light_tool_bundle",
-        toolSchemas: ["ctx_get_tool"],
+        toolSchemas: ["forge_tools"],
         toolBudget: 120,
         preloads: lowered.includes("search") || lowered.includes("find")
           ? [{
@@ -976,7 +976,7 @@ export class ContextForge {
     const needsSession = /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
     return {
       name: needsSession ? "full_session_pack" : "full_repo_pack",
-      toolSchemas: ["ctx_get_tool"],
+      toolSchemas: ["forge_tools"],
       toolBudget: 108,
       preloads: needsSession
         ? [{
