@@ -7,6 +7,9 @@ const skillNames = [
   "contextforge",
   "forge-understand",
   "forge-walk",
+  "forge-read",
+  "forge-write",
+  "forge-bash",
   "forge-search",
   "forge-impact",
   "forge-resume",
@@ -32,7 +35,9 @@ test("forge-edit skill explicitly routes through ContextForge before built-in fi
   const body = fs.readFileSync(path.join("skills", "forge-edit", "SKILL.md"), "utf8");
 
   assert.match(body, /forge_search/);
+  assert.match(body, /forge_read/);
+  assert.match(body, /forge_write/);
   assert.match(body, /forge_symbol/);
   assert.match(body, /forge_impact/);
-  assert.match(body, /built-in file tools/);
+  assert.doesNotMatch(body, /built-in file tools/);
 });

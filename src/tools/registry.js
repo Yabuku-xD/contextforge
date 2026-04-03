@@ -3,6 +3,10 @@ import { ctxStartup } from "./ctx_startup.js";
 import { ctxScan } from "./ctx_scan.js";
 import { ctxUnderstand } from "./ctx_understand.js";
 import { ctxWalk } from "./ctx_walk.js";
+import { ctxRead } from "./ctx_read.js";
+import { ctxWrite } from "./ctx_write.js";
+import { ctxEdit } from "./ctx_edit.js";
+import { ctxBash } from "./ctx_bash.js";
 import { ctxSearch } from "./ctx_search.js";
 import { ctxSymbol } from "./ctx_symbol.js";
 import { ctxScope } from "./ctx_scope.js";
@@ -19,6 +23,10 @@ export const TOOL_REGISTRY = {
   ctx_scan: ctxScan,
   ctx_understand: ctxUnderstand,
   ctx_walk: ctxWalk,
+  ctx_read: ctxRead,
+  ctx_write: ctxWrite,
+  ctx_edit: ctxEdit,
+  ctx_bash: ctxBash,
   ctx_search: ctxSearch,
   ctx_symbol: ctxSymbol,
   ctx_scope: ctxScope,

@@ -60,6 +60,9 @@ After install, ContextForge also exposes user-invocable chat commands in Claude 
 /contextforge:contextforge [request]
 /contextforge:forge-understand [request]
 /contextforge:forge-walk [request]
+/contextforge:forge-read [path]
+/contextforge:forge-write [instruction]
+/contextforge:forge-bash [command]
 /contextforge:forge-search [query]
 /contextforge:forge-impact [target]
 /contextforge:forge-resume
@@ -72,9 +75,12 @@ Recommended usage:
 
 - `/contextforge:forge-understand` for normal repo orientation
 - `/contextforge:forge-walk` for exhaustive whole-project walkthroughs
+- `/contextforge:forge-read` for compact file excerpts or directory listings
+- `/contextforge:forge-write` for file creation or overwrite
+- `/contextforge:forge-bash` for compact shell execution inside the repo
 - `/contextforge:forge-search` to find relevant files or symbols
 - `/contextforge:forge-impact` before edits or refactors
-- `/contextforge:forge-edit` when you want ContextForge to narrow the file set before Claude reads or edits files
+- `/contextforge:forge-edit` for repo-aware exact edits with ContextForge-native file ops
 
 ## Requirements
 

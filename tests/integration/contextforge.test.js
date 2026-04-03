@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
 
 import { createContextForge } from "../../src/contextforge.js";
 import { recordSessionEvent } from "../../src/session/events.js";
@@ -67,5 +69,37 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.equal(routed.mode, "inventory_walk");
   } finally {
     forge.close();
+  }
+});
+
+test("ContextForge native file ops handle read write edit directory and bash flows", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-fileops-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "fileops-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export function run() {\n  return 'hello';\n}\n");
+
+  const forge = createContextForge(tempRoot, { sessionId: `file_ops_${Date.now()}` });
+  try {
+    const fileRead = forge.read("src/app.js", { startLine: 1, endLine: 2 });
+    assert.equal(fileRead.kind, "file");
+    assert.match(fileRead.excerpt, /1 \| export function run/);
+
+    const dirRead = forge.read("src");
+    assert.equal(dirRead.kind, "directory");
+    assert.ok(dirRead.entries.some((entry) => entry.name === "app.js"));
+
+    const writeResult = forge.write("notes/todo.md", "alpha\nbeta\n");
+    assert.equal(writeResult.created, true);
+
+    const editResult = forge.edit("notes/todo.md", "beta", "gamma");
+    assert.equal(editResult.replacements, 1);
+    assert.match(editResult.preview, /gamma/);
+
+    const bashResult = await forge.bash("pwd");
+    assert.equal(bashResult.exitCode, 0);
+    assert.match(bashResult.stdoutPreview, /contextforge-fileops-/);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });

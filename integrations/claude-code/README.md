@@ -51,6 +51,9 @@ Once installed, Claude Code can also invoke ContextForge through chat commands:
 ```text
 /contextforge:forge-understand [request]
 /contextforge:forge-walk [request]
+/contextforge:forge-read [path]
+/contextforge:forge-write [instruction]
+/contextforge:forge-bash [command]
 /contextforge:forge-search [query]
 /contextforge:forge-impact [target]
 /contextforge:forge-resume

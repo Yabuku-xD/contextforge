@@ -24,6 +24,10 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(tools.tools.some((tool) => tool.name === "forge_scan"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_understand"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_walk"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_read"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_write"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_edit"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_bash"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_search"));
 
     const scan = await client.callTool({
@@ -77,6 +81,26 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     });
     assert.ok(!walk.isError);
     assert.match(walk.content[0].text, /deeper repository map/i);
+
+    const read = await client.callTool({
+      name: "forge_read",
+      arguments: {
+        path: "src/checkout.ts",
+        start_line: "1",
+        end_line: "3"
+      }
+    });
+    assert.ok(!read.isError);
+    assert.match(read.content[0].text, /checkout/i);
+
+    const bash = await client.callTool({
+      name: "forge_bash",
+      arguments: {
+        command: "pwd"
+      }
+    });
+    assert.ok(!bash.isError);
+    assert.match(bash.content[0].text, /stdoutPreview/i);
   } finally {
     await client.close();
     await transport.close();

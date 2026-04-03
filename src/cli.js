@@ -154,6 +154,31 @@ async function main(argv) {
         forge.indexRepository();
         console.log(JSON.stringify(forge.walk(query), null, 2));
         break;
+      case "read":
+        console.log(JSON.stringify(forge.read(query, {
+          startLine: rest[2],
+          endLine: rest[3],
+          maxLines: rest[4],
+          limit: rest[2]
+        }), null, 2));
+        break;
+      case "write":
+        console.log(JSON.stringify(forge.write(query, rest[2] ?? "", {
+          createDirs: rest[3]
+        }), null, 2));
+        break;
+      case "edit":
+        console.log(JSON.stringify(forge.edit(query, rest[2] ?? "", rest[3] ?? "", {
+          replaceAll: rest[4]
+        }), null, 2));
+        break;
+      case "bash":
+        console.log(JSON.stringify(await forge.bash(query, {
+          cwd: rest[2],
+          timeoutMs: rest[3],
+          maxChars: rest[4]
+        }), null, 2));
+        break;
       case "compress": {
         const artifact = query;
         const metadataArg = rest[2];

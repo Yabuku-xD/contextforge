@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { openDatabase } from "./storage/db.js";
@@ -36,10 +37,12 @@ import { tokenize, unique } from "./utils/text.js";
 import { MODEL_METADATA } from "./storage/model-metadata.js";
 import { purgeOldSessionEvents } from "./session/retention.js";
 import { clearActiveSession } from "./session/runtime.js";
-import { readText } from "./utils/fs.js";
+import { ensureDir, exists, readText, relativeTo, writeText } from "./utils/fs.js";
+import { runShellCommand } from "./utils/process.js";
 
 const REPO_STATE_CACHE = new Map();
 const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
+const DEFAULT_FILE_OP_IGNORES = new Set([".git", ".contextforge", "node_modules"]);
 
 export class ContextForge {
   constructor(rootDir, options = {}) {
@@ -490,6 +493,10 @@ export class ContextForge {
       "forge_scan",
       "forge_understand",
       "forge_walk",
+      "forge_read",
+      "forge_write",
+      "forge_edit",
+      "forge_bash",
       "forge_search",
       "forge_symbol",
       "forge_scope",
@@ -625,6 +632,190 @@ export class ContextForge {
       importantFiles: overview.importantFiles,
       packageSections,
       directorySections
+    };
+  }
+
+  read(targetPath, options = {}) {
+    const resolved = this._resolveWorkspacePath(targetPath);
+    const relativePath = relativeTo(this.rootDir, resolved);
+    const stat = fs.statSync(resolved);
+
+    if (stat.isDirectory()) {
+      const entries = this._listDirectoryEntries(resolved, options.limit);
+      recordSessionEvent(this.db, {
+        repoId: this.repoId,
+        sessionId: this.sessionId,
+        eventType: "read_directory",
+        payload: {
+          filePath: relativePath,
+          entryCount: entries.length
+        }
+      });
+      return {
+        path: relativePath,
+        kind: "directory",
+        entryCount: entries.length,
+        entries,
+        summary: `Listed ${entries.length} entries in ${relativePath}.`
+      };
+    }
+
+    const content = readText(resolved);
+    const lines = normalizeFileLines(content);
+    const totalLines = lines.length || 1;
+    const maxLines = clampNumber(options.maxLines, 1, 400, 120);
+    const requestedStart = clampNumber(options.startLine, 1, totalLines, 1);
+    const requestedEnd = options.endLine == null
+      ? Math.min(totalLines, requestedStart + maxLines - 1)
+      : clampNumber(options.endLine, requestedStart, totalLines, Math.min(totalLines, requestedStart + maxLines - 1));
+    const excerptLines = lines.slice(requestedStart - 1, requestedEnd);
+    const excerpt = formatNumberedLines(excerptLines, requestedStart, requestedEnd);
+    const truncated = requestedStart > 1 || requestedEnd < totalLines;
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "read_file",
+      payload: {
+        filePath: relativePath,
+        startLine: requestedStart,
+        endLine: requestedEnd
+      }
+    });
+
+    return {
+      path: relativePath,
+      kind: "file",
+      totalLines,
+      startLine: requestedStart,
+      endLine: requestedEnd,
+      truncated,
+      excerpt,
+      summary: `Read lines ${requestedStart}-${requestedEnd} of ${totalLines} from ${relativePath}.`
+    };
+  }
+
+  write(targetPath, content, options = {}) {
+    const resolved = this._resolveWorkspacePath(targetPath, {
+      allowMissing: true,
+      createParent: coerceBoolean(options.createDirs, true)
+    });
+    const relativePath = relativeTo(this.rootDir, resolved);
+    const existed = exists(resolved);
+    const previousBytes = existed ? fs.statSync(resolved).size : 0;
+
+    writeText(resolved, String(content ?? ""));
+    this._invalidateRepoCaches();
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: existed ? "write_file" : "create_file",
+      payload: {
+        filePath: relativePath,
+        previousBytes,
+        bytesWritten: Buffer.byteLength(String(content ?? ""), "utf8")
+      }
+    });
+
+    return {
+      path: relativePath,
+      created: !existed,
+      bytesWritten: Buffer.byteLength(String(content ?? ""), "utf8"),
+      linesWritten: normalizeFileLines(String(content ?? "")).length,
+      summary: `${existed ? "Updated" : "Created"} ${relativePath}.`
+    };
+  }
+
+  edit(targetPath, oldText, newText, options = {}) {
+    const resolved = this._resolveWorkspacePath(targetPath);
+    const relativePath = relativeTo(this.rootDir, resolved);
+    const before = readText(resolved);
+    const beforeNormalized = String(before ?? "");
+    const source = String(oldText ?? "");
+    const replacement = String(newText ?? "");
+    const replaceAll = coerceBoolean(options.replaceAll, false);
+
+    if (!source.length) {
+      throw new Error("forge_edit requires old_text to be non-empty.");
+    }
+
+    const occurrences = countOccurrences(beforeNormalized, source);
+    if (!occurrences) {
+      throw new Error(`forge_edit could not find the target text in ${relativePath}.`);
+    }
+
+    const after = replaceAll
+      ? beforeNormalized.split(source).join(replacement)
+      : beforeNormalized.replace(source, replacement);
+    writeText(resolved, after);
+    this._invalidateRepoCaches();
+
+    const changedIndex = after.indexOf(replacement);
+    const preview = buildExcerptAroundIndex(after, changedIndex, {
+      contextLines: 2,
+      maxLines: 10
+    });
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "edit_file",
+      payload: {
+        filePath: relativePath,
+        replacements: replaceAll ? occurrences : 1
+      }
+    });
+
+    return {
+      path: relativePath,
+      replacements: replaceAll ? occurrences : 1,
+      replaceAll,
+      preview,
+      summary: `Edited ${relativePath} with ${replaceAll ? occurrences : 1} replacement${replaceAll ? "s" : ""}.`
+    };
+  }
+
+  async bash(command, options = {}) {
+    const resolvedCwd = this._resolveWorkspaceCwd(options.cwd);
+    const maxChars = clampNumber(options.maxChars, 400, 16000, 4000);
+    const timeoutMs = clampNumber(options.timeoutMs, 250, 120000, 15000);
+    const result = await runShellCommand({
+      command: String(command ?? ""),
+      cwd: resolvedCwd,
+      timeoutMs
+    });
+    const stdoutPreview = compactCommandOutput(result.stdout, maxChars);
+    const stderrPreview = compactCommandOutput(result.stderr, Math.max(800, Math.floor(maxChars / 2)));
+    const relativeCwd = relativeTo(this.rootDir, resolvedCwd);
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "command",
+      payload: {
+        command: String(command ?? ""),
+        cwd: relativeCwd,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut
+      }
+    });
+
+    return {
+      command: String(command ?? ""),
+      cwd: relativeCwd,
+      exitCode: result.exitCode,
+      timedOut: result.timedOut,
+      stdoutPreview,
+      stderrPreview,
+      summary: buildCommandSummary({
+        command: String(command ?? ""),
+        cwd: relativeCwd,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        stdout: result.stdout,
+        stderr: result.stderr
+      })
     };
   }
 
@@ -1191,6 +1382,66 @@ export class ContextForge {
     const files = loadRepositoryInventory(this.rootDir, this.repoId);
     this._repoInventory = { files };
     return this._repoInventory;
+  }
+
+  _resolveWorkspacePath(targetPath, options = {}) {
+    const input = String(targetPath ?? "").trim();
+    if (!input) {
+      throw new Error("A path is required.");
+    }
+
+    const resolved = path.resolve(this.rootDir, input);
+    const relativePath = path.relative(this.rootDir, resolved);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+      throw new Error("Path must stay inside the current repository.");
+    }
+
+    if (!options.allowMissing && !exists(resolved)) {
+      throw new Error(`Path not found: ${input}`);
+    }
+
+    if (options.createParent) {
+      ensureDir(path.dirname(resolved));
+    }
+
+    return resolved;
+  }
+
+  _resolveWorkspaceCwd(cwd) {
+    const requested = String(cwd ?? ".").trim() || ".";
+    const resolved = this._resolveWorkspacePath(requested, { allowMissing: false });
+    if (!fs.statSync(resolved).isDirectory()) {
+      throw new Error(`cwd must be a directory inside the repository: ${requested}`);
+    }
+    return resolved;
+  }
+
+  _listDirectoryEntries(dirPath, limit) {
+    const maxEntries = clampNumber(limit, 1, 500, 120);
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      .filter((entry) => !DEFAULT_FILE_OP_IGNORES.has(entry.name))
+      .map((entry) => {
+        const fullPath = path.join(dirPath, entry.name);
+        const stat = fs.statSync(fullPath);
+        return {
+          name: entry.name,
+          kind: entry.isDirectory()
+            ? "directory"
+            : entry.isSymbolicLink()
+              ? "symlink"
+              : "file",
+          size: entry.isDirectory() ? null : stat.size
+        };
+      })
+      .sort((left, right) => {
+        if (left.kind !== right.kind) {
+          return left.kind === "directory" ? -1 : 1;
+        }
+        return left.name.localeCompare(right.name);
+      })
+      .slice(0, maxEntries);
+
+    return entries;
   }
 
   _readPackageInfo() {
@@ -1772,4 +2023,95 @@ function matchesWorkspacePattern(relativePath, pattern) {
     .map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("[^/]+");
   return new RegExp(`^${escaped}$`).test(packageDir);
+}
+
+function normalizeFileLines(content) {
+  return String(content ?? "").replace(/\r\n/g, "\n").split("\n");
+}
+
+function formatNumberedLines(lines, startLine, endLine) {
+  const width = String(endLine).length;
+  return lines
+    .map((line, index) => `${String(startLine + index).padStart(width, " ")} | ${line}`)
+    .join("\n");
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = typeof value === "string" ? Number.parseInt(value, 10) : value;
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(parsed)));
+}
+
+function coerceBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const lowered = value.toLowerCase().trim();
+    if (["1", "true", "yes", "on"].includes(lowered)) {
+      return true;
+    }
+    if (["0", "false", "no", "off"].includes(lowered)) {
+      return false;
+    }
+  }
+  return fallback;
+}
+
+function countOccurrences(text, pattern) {
+  if (!pattern) {
+    return 0;
+  }
+  return text.split(pattern).length - 1;
+}
+
+function buildExcerptAroundIndex(content, index, { contextLines = 2, maxLines = 10 } = {}) {
+  const lines = normalizeFileLines(content);
+  const safeIndex = Math.max(0, index);
+  let charCount = 0;
+  let targetLine = 0;
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    charCount += lines[lineIndex].length + 1;
+    if (safeIndex < charCount) {
+      targetLine = lineIndex + 1;
+      break;
+    }
+  }
+  if (!targetLine) {
+    targetLine = Math.max(1, lines.length);
+  }
+
+  const startLine = Math.max(1, targetLine - contextLines);
+  const endLine = Math.min(lines.length, startLine + maxLines - 1);
+  return formatNumberedLines(lines.slice(startLine - 1, endLine), startLine, endLine);
+}
+
+function compactCommandOutput(text, maxChars = 4000) {
+  const normalized = String(text ?? "").replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+
+  const headChars = Math.max(400, Math.floor(maxChars * 0.65));
+  const tailChars = Math.max(200, maxChars - headChars - 64);
+  return `${normalized.slice(0, headChars)}\n... [output truncated] ...\n${normalized.slice(-tailChars)}`;
+}
+
+function buildCommandSummary({ command, cwd, exitCode, timedOut, stdout, stderr }) {
+  const stdoutLines = normalizeFileLines(stdout).filter(Boolean).length;
+  const stderrLines = normalizeFileLines(stderr).filter(Boolean).length;
+  const status = timedOut
+    ? "timed out"
+    : exitCode === 0
+      ? "succeeded"
+      : `failed with exit ${exitCode}`;
+  const location = cwd === "." ? "repository root" : cwd;
+
+  return `Ran "${command}" in ${location}. Command ${status}. stdout lines: ${stdoutLines}. stderr lines: ${stderrLines}.`;
 }
