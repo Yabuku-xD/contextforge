@@ -54,8 +54,10 @@ This marketplace installs the plugin directly from GitHub. There is no npm publi
 
 ## Requirements
 
-- Node.js 18+ recommended
+- Node.js 22.5+ recommended
 - `npm`
+
+Claude Code plugin installs bootstrap their runtime automatically on first launch and cache it under `~/.contextforge/runtime/`.
 
 ## 1. Install from this repo
 

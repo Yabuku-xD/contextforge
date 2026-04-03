@@ -16,8 +16,6 @@ test("claude plugin marketplace metadata is present and points at the versioned 
   assert.equal(plugin.mcpServers, "./.mcp.json");
   assert.equal(plugin.license, "MIT");
 
-  assert.equal(mcp.mcpServers.contextforge.command, "npx");
-  assert.equal(mcp.mcpServers.contextforge.args[0], "-y");
-  assert.equal(mcp.mcpServers.contextforge.args[1], "github:Yabuku-xD/contextforge#v0.1.9");
-  assert.equal(mcp.mcpServers.contextforge.args[2], "mcp-stdio");
+  assert.equal(mcp.mcpServers.contextforge.command, "node");
+  assert.equal(mcp.mcpServers.contextforge.args[0], "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/bootstrap-mcp.mjs");
 });

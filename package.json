@@ -1,12 +1,15 @@
 {
   "name": "contextforge",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Claude-first context optimizer for code agents",
   "license": "MIT",
   "homepage": "https://github.com/Yabuku-xD/contextforge",
   "repository": {
     "type": "git",
     "url": "https://github.com/Yabuku-xD/contextforge.git"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   },
   "type": "module",
   "main": "src/cli.js",
@@ -34,7 +37,6 @@
   "dependencies": {
     "@atjsh/llmlingua-2": "^2.0.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.8.0",
     "tree-sitter": "^0.21.1",
     "tree-sitter-javascript": "^0.23.1",
     "tree-sitter-typescript": "^0.23.2",

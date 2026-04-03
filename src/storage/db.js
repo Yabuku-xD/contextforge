@@ -1,5 +1,5 @@
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { readText, ensureDir } from "../utils/fs.js";
 
 export function openDatabase(rootDir) {
@@ -8,9 +8,16 @@ export function openDatabase(rootDir) {
   const dbPath = path.join(dataDir, "contextforge.db");
   const schemaPath = new URL("./schema.sql", import.meta.url);
 
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000");
+  const db = new DatabaseSync(dbPath);
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
+  const prepare = db.prepare.bind(db);
+  db.prepare = (sql) => {
+    const statement = prepare(sql);
+    statement.setAllowBareNamedParameters?.(true);
+    statement.setAllowUnknownNamedParameters?.(true);
+    return statement;
+  };
   db.exec(readText(schemaPath));
   ensureColumn(db, "repositories", "content_fingerprint", "TEXT");
   ensureColumn(db, "repositories", "file_count", "INTEGER");
