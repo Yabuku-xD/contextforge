@@ -1,36 +1,43 @@
 # ContextForge
 
-ContextForge is a local context engine for code agents. It combines conservative compression, hybrid code retrieval, architecture lookup, impact analysis, session memory, and paging behind a CLI and a stdio MCP server.
+[![Docs](https://img.shields.io/badge/DOCS-README-4B5563?style=for-the-badge)](./README.md)
+[![Claude Code](https://img.shields.io/badge/CLAUDE%20CODE-MARKETPLACE-2563EB?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
+[![Context Layer](https://img.shields.io/badge/CATEGORY-CONTEXT%20LAYER-FACC15?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
+[![Release](https://img.shields.io/badge/RELEASE-v0.1.0-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
+[![License](https://img.shields.io/badge/LICENSE-MIT-166534?style=for-the-badge)](./LICENSE)
 
-## What it ships
+The context layer for Claude Code.
 
-- `contextforge` CLI for indexing, search, scope, impact, session, benchmarks, release gates, and scoreboards
-- `contextforge-mcp` stdio MCP server for MCP-capable clients
-- Claude Code install examples in [`integrations/claude-code`](./integrations/claude-code)
-- local benchmark and comparison harnesses
+ContextForge helps teams keep coding sessions coherent, searchable, and durable as work gets longer, noisier, and more collaborative. It is designed for people who want Claude Code to stay oriented across large repositories, changing tasks, and repeated handoffs without turning every session into a context-management problem.
 
-## Core capabilities
+## Why It Exists
 
-- conservative compression with exact bypass for code, diffs, JSON, stack traces, CSV, and line-numbered snippets
-- exact, BM25, dense, RAPTOR, and graph-reranked retrieval
-- query-aware architecture lookup with collapsed or traversal RAPTOR routing
-- JS/TS impact analysis with import and call resolution
-- repo graph plus session graph memory
-- session paging, fault tracking, eviction, pinning, and prefetch
+Most coding workflows break down in the same places:
 
-## Quick start
+- too much raw tool output floods the session
+- important project context gets scattered across files, prompts, and prior runs
+- architectural questions and impact analysis take too much manual digging
+- long-running work loses continuity at the exact moment speed matters most
 
-```bash
-npm install
-npm test
-node ./src/cli.js install-claude .
-node ./src/cli.js release ./tests/fixtures/sample-app
-node ./src/cli.js scoreboard ./tests/fixtures/sample-app
-```
+ContextForge is built to reduce that drag. It gives Claude Code a cleaner working memory surface, stronger repository awareness, and a more dependable sense of what matters right now.
 
-## Claude Code marketplace install
+## What You Get
 
-This repo is now marketplace-ready for Claude Code.
+- Better continuity across long sessions and repeated iterations
+- Faster path from question to relevant code context
+- Cleaner retrieval for architecture, scope, and blast-radius questions
+- More reliable project memory without adding setup friction to every repo
+- Open-source distribution with a marketplace-friendly Claude Code install flow
+
+## Who It Is For
+
+- Individual developers who want Claude Code to stay sharp across longer tasks
+- Teams that want a reusable context layer instead of prompt-by-prompt workarounds
+- Repositories where architecture, change impact, and session continuity matter
+
+## Claude Code Marketplace Install
+
+This repository is marketplace-ready for Claude Code.
 
 Install flow:
 
@@ -46,92 +53,21 @@ Other scopes:
 /plugin install contextforge@contextforge --scope local
 ```
 
-This marketplace installs directly from the GitHub repository, so there is no npm publish step for plugin installation.
+## What Happens After Install
 
-For local development before using the marketplace flow, keep using:
+Once installed, ContextForge gives Claude Code a stronger context operating layer for project work. The goal is simple: less time recovering context, less time re-explaining repository state, and more time moving work forward.
 
-```bash
-node ./src/cli.js install-claude .
-```
+No extra environment file is required for the default install path.
 
-## Fastest Claude Code install
+## Open Source
 
-From the repo root or an installed package:
+ContextForge is open source under the MIT license and published from this repository:
 
-```bash
-contextforge install-claude .
-```
+- Repository: https://github.com/Yabuku-xD/contextforge
+- License: [MIT](./LICENSE)
 
-If you are running directly from the checkout without a global install:
+## Documentation
 
-```bash
-node ./src/cli.js install-claude .
-```
+If you want deeper setup details, local development guidance, storage notes, or MCP-specific instructions, start here:
 
-That writes a project-scoped `.mcp.json` entry for ContextForge automatically.
-
-## Common commands
-
-```bash
-node ./src/cli.js doctor .
-node ./src/cli.js index .
-node ./src/cli.js search "checkout timeout" .
-node ./src/cli.js scope "architecture overview of checkout and retry flow" .
-node ./src/cli.js impact "shouldRetry" .
-node ./src/cli.js why "checkout timeout" .
-node ./src/cli.js stats .
-node ./src/cli.js release .
-node ./src/cli.js scoreboard .
-```
-
-## MCP tools
-
-The MCP server exposes:
-
-- `ctx_startup`
-- `ctx_search`
-- `ctx_symbol`
-- `ctx_scope`
-- `ctx_impact`
-- `ctx_why`
-- `ctx_session`
-- `ctx_resume`
-- `ctx_stats`
-- `ctx_doctor`
-
-Run it locally with:
-
-```bash
-contextforge-mcp --root .
-```
-
-or:
-
-```bash
-contextforge mcp-stdio --root .
-```
-
-## Benchmarks and release status
-
-- `release` reports the final product state
-- `scoreboard` prints side-by-side open-track, local SWE-bench subset, and local closed-track stats
-- `compare` runs the open-track comparison against `bare_workflow`, `context_mode`, `token_savior`, and `contextforge`
-- `phase3` bundles the open track, SWE-bench subset, and closed-track results
-
-## Install
-
-See [INSTALL.md](./INSTALL.md) for:
-
-- local CLI setup
-- generic MCP client setup
-- Claude Code setup
-- one-command Claude Code install
-- config snippets and verification steps
-
-## Notes
-
-- Set `CONTEXTFORGE_USE_LLMLINGUA=1` to enable the LLMLingua-2 backend.
-- Runtime state is stored under `.contextforge/`.
-- Active session continuity uses `.contextforge/active-session.json`.
-- No `.env` file is required for the default local/plugin install.
-- Claude Code marketplace metadata lives in [.claude-plugin/marketplace.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/marketplace.json) and [.claude-plugin/plugin.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/plugin.json).
+- [INSTALL.md](./INSTALL.md)
