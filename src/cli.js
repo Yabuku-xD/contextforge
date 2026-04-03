@@ -203,7 +203,7 @@ async function main(argv) {
         console.log(JSON.stringify(forge.purge(), null, 2));
         break;
       case "tool":
-        console.log(JSON.stringify(TOOL_REGISTRY.ctx_get_tool.execute(forge, { tool_name: query || "list" }), null, 2));
+        console.log(JSON.stringify(TOOL_REGISTRY.forge_get_tool.execute(forge, { tool_name: query || "list" }), null, 2));
         break;
       case "doctor":
       default:

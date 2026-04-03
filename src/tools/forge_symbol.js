@@ -1,4 +1,4 @@
-export const ctxSymbol = {
+export const forgeSymbolTool = {
   name: "forge_symbol",
   description: "Exact and fuzzy symbol lookup.",
   parameters: { query: "string", limit: "number?" },

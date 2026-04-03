@@ -1,4 +1,4 @@
-export const ctxRead = {
+export const forgeReadTool = {
   name: "forge_read",
   description: "Read a file excerpt or list a directory inside the current repository with compact output.",
   parameters: {

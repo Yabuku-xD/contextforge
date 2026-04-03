@@ -1,4 +1,4 @@
-export const ctxSearch = {
+export const forgeSearchTool = {
   name: "forge_search",
   description: "Hybrid code search across exact, BM25, dense, RAPTOR, and graph reranking.",
   parameters: { query: "string", limit: "number?" },

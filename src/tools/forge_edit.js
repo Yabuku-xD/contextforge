@@ -1,4 +1,4 @@
-export const ctxEdit = {
+export const forgeEditTool = {
   name: "forge_edit",
   description: "Apply an exact text replacement inside a file with compact preview output.",
   parameters: {

@@ -1,4 +1,4 @@
-export const ctxBash = {
+export const forgeBashTool = {
   name: "forge_bash",
   description: "Run a shell command inside the current repository with compact stdout and stderr previews.",
   parameters: {

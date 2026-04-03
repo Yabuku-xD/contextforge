@@ -1,4 +1,4 @@
-export const ctxWrite = {
+export const forgeWriteTool = {
   name: "forge_write",
   description: "Create or overwrite a file inside the current repository.",
   parameters: {
