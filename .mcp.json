@@ -4,8 +4,8 @@
       "command": "npx",
       "args": [
         "-y",
-        "github:Yabuku-xD/contextforge#v0.1.1",
-        "contextforge-mcp"
+        "github:Yabuku-xD/contextforge#v0.1.2",
+        "mcp-stdio"
       ],
       "env": {
         "CONTEXTFORGE_USE_ACTIVE_SESSION": "1"
