@@ -52,6 +52,30 @@ What the scopes mean:
 
 This marketplace installs the plugin directly from GitHub. There is no npm publish requirement for the Claude Code plugin flow.
 
+## Claude Code chat commands
+
+After install, ContextForge also exposes user-invocable chat commands in Claude Code:
+
+```text
+/contextforge:contextforge [request]
+/contextforge:forge-understand [request]
+/contextforge:forge-walk [request]
+/contextforge:forge-search [query]
+/contextforge:forge-impact [target]
+/contextforge:forge-resume
+/contextforge:forge-stats
+/contextforge:forge-doctor
+/contextforge:forge-edit [change request]
+```
+
+Recommended usage:
+
+- `/contextforge:forge-understand` for normal repo orientation
+- `/contextforge:forge-walk` for exhaustive whole-project walkthroughs
+- `/contextforge:forge-search` to find relevant files or symbols
+- `/contextforge:forge-impact` before edits or refactors
+- `/contextforge:forge-edit` when you want ContextForge to narrow the file set before Claude reads or edits files
+
 ## Requirements
 
 - Node.js 22.5+ recommended

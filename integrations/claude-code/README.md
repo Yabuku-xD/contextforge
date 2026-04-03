@@ -45,3 +45,16 @@ If you are running from a local checkout instead of an installed package, point 
 ```bash
 claude mcp add --transport stdio --scope project contextforge -- node /absolute/path/to/contextforge/src/mcp-server.js --root .
 ```
+
+Once installed, Claude Code can also invoke ContextForge through chat commands:
+
+```text
+/contextforge:forge-understand [request]
+/contextforge:forge-walk [request]
+/contextforge:forge-search [query]
+/contextforge:forge-impact [target]
+/contextforge:forge-resume
+/contextforge:forge-stats
+/contextforge:forge-doctor
+/contextforge:forge-edit [change request]
+```
