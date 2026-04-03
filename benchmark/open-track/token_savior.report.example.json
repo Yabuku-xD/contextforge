@@ -1,0 +1,12 @@
+{
+  "name": "token_savior",
+  "available": true,
+  "source": "external_import",
+  "summary": {
+    "startup": { "avgTokensBeforeUsefulAction": 0, "avgLatencyMs": 0 },
+    "compression": { "fidelityRate": 0, "avgTokenReduction": 0 },
+    "retrieval": { "hitAt1": 0, "hitAt5": 0, "mrr": 0, "avgTokensToCorrectAnswer": 0 },
+    "session": { "recallAtK": 0, "correctnessRate": 0, "falseCausalLinkRate": 0 },
+    "endToEnd": { "successRate": 0, "tokensPerSuccessfulTask": 0, "filesReadPerSuccessfulTask": 0 }
+  }
+}

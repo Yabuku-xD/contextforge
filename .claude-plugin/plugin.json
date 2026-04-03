@@ -1,0 +1,18 @@
+{
+  "name": "contextforge",
+  "version": "0.1.0",
+  "description": "Context engine for code agents with hybrid retrieval, architecture lookup, impact analysis, and session memory",
+  "author": {
+    "name": "Yabuku-xD"
+  },
+  "homepage": "https://github.com/Yabuku-xD/contextforge",
+  "repository": "https://github.com/Yabuku-xD/contextforge",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "context",
+    "retrieval"
+  ],
+  "mcpServers": "./.mcp.json"
+}

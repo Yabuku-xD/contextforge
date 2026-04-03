@@ -1,0 +1,46 @@
+{
+  "name": "token_savior",
+  "available": true,
+  "source": "token_savior_0.7.1_manual_run",
+  "summary": {
+    "startup": {
+      "avgTokensBeforeUsefulAction": 98,
+      "avgLatencyMs": 0.029402668587863445,
+      "avgFilesRead": 1.3333333333333333
+    },
+    "compression": {
+      "fidelityRate": 1,
+      "avgTokenReduction": 0,
+      "avgLatencyMs": 0
+    },
+    "retrieval": {
+      "hitAt1": 1,
+      "hitAt5": 1,
+      "mrr": 1,
+      "avgTokensToCorrectAnswer": 129.33333333333334,
+      "avgFilesRead": 1.1666666666666667,
+      "avgLatencyMs": 0.00962499325396493
+    },
+    "session": {
+      "recallAtK": 0,
+      "correctnessRate": 0,
+      "falseCausalLinkRate": 0,
+      "avgLatencyMs": 0
+    },
+    "endToEnd": {
+      "successRate": 0.75,
+      "tokensPerSuccessfulTask": 105.5,
+      "startupCost": 0,
+      "steadyStateCost": 79.125,
+      "filesReadPerSuccessfulTask": 1,
+      "avgLatencyMs": 0.008343873560079373
+    }
+  },
+  "notes": [
+    "Generated from token-savior 0.7.1 against the sample fixture repo with Python 3.11.",
+    "Excluded .contextforge runtime files from the index to avoid counting ContextForge's own active-session metadata as project context.",
+    "Compression is treated as exact/no-op because token-savior provides structural lookup tools, not artifact compression.",
+    "Session metrics are zero because token-savior does not provide cross-step or cross-session recall over the benchmark setup events.",
+    "End-to-end and startup costs count serialized tool outputs returned to the model, not internal index build time."
+  ]
+}

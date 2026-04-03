@@ -1,0 +1,57 @@
+[
+  {
+    "id": "e2e_auth_lookup",
+    "kind": "symbol",
+    "query": "authentication credentials",
+    "expectedTop": "src/auth.js::parseSession"
+  },
+  {
+    "id": "e2e_checkout_timeout",
+    "kind": "search",
+    "query": "checkout timeout",
+    "expectedTop": "src/checkout.ts::createCheckout"
+  },
+  {
+    "id": "e2e_architecture_overview",
+    "kind": "scope",
+    "query": "architecture overview of checkout and retry flow",
+    "expectedAny": ["src/checkout.ts", "src/retry.js"]
+  },
+  {
+    "id": "e2e_blast_radius",
+    "kind": "impact",
+    "query": "shouldRetry",
+    "expectedIncludes": ["src/checkout.ts::createCheckout"]
+  },
+  {
+    "id": "e2e_session_recall",
+    "kind": "why",
+    "query": "checkout timeout",
+    "setupEvents": [
+      { "eventType": "edit", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout" } },
+      { "eventType": "failure", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout", "message": "Gateway timeout" } }
+    ],
+    "expectedSessionMin": 1
+  },
+  {
+    "id": "e2e_auth_search",
+    "kind": "search",
+    "query": "auth middleware",
+    "expectedTop": "src/auth.js::parseSession"
+  },
+  {
+    "id": "e2e_retry_helper",
+    "kind": "symbol",
+    "query": "retry backoff",
+    "expectedIncludes": ["src/retry.js::backoffMs"]
+  },
+  {
+    "id": "e2e_decision_trace",
+    "kind": "session",
+    "query": "retry path",
+    "setupEvents": [
+      { "eventType": "decision", "payload": { "decision": "Investigate retry path first" } }
+    ],
+    "expectedSessionMin": 1
+  }
+]

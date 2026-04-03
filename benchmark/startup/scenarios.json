@@ -1,0 +1,17 @@
+[
+  {
+    "id": "startup_trivial",
+    "message": "hi",
+    "expectedFiles": []
+  },
+  {
+    "id": "startup_simple_auth",
+    "message": "fix typo in auth error message",
+    "expectedFiles": ["src/auth.js"]
+  },
+  {
+    "id": "startup_complex_checkout",
+    "message": "why is checkout timing out and which files are likely involved?",
+    "expectedFiles": ["src/checkout.ts", "src/retry.js"]
+  }
+]

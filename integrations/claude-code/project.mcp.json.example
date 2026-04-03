@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "contextforge": {
+      "command": "npx",
+      "args": ["-y", "contextforge", "mcp-stdio"],
+      "env": {
+        "CONTEXTFORGE_USE_ACTIVE_SESSION": "1"
+      }
+    }
+  }
+}

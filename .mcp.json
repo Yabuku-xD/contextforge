@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "contextforge": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.js"
+      ],
+      "env": {
+        "CONTEXTFORGE_USE_ACTIVE_SESSION": "1"
+      }
+    }
+  }
+}

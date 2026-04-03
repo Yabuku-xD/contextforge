@@ -1,0 +1,42 @@
+[
+  {
+    "id": "retrieval_exact_symbol",
+    "kind": "symbol",
+    "query": "parseSession",
+    "expectedTop": "src/auth.js::parseSession"
+  },
+  {
+    "id": "retrieval_semantic_bug",
+    "kind": "search",
+    "query": "checkout timeout",
+    "expectedTop": "src/checkout.ts::createCheckout"
+  },
+  {
+    "id": "retrieval_architecture",
+    "kind": "scope",
+    "query": "architecture overview of checkout and retry flow",
+    "expectedAny": ["src/checkout.ts", "src/retry.js"]
+  },
+  {
+    "id": "retrieval_cross_file_trace",
+    "kind": "impact",
+    "query": "shouldRetry",
+    "expectedIncludes": ["src/checkout.ts::createCheckout"]
+  },
+  {
+    "id": "retrieval_value_flow",
+    "kind": "impact",
+    "query": "parseSession",
+    "expectedIncludes": ["src/auth.js::requireUser", "src/checkout.ts::createCheckout"]
+  },
+  {
+    "id": "retrieval_behavior_change",
+    "kind": "why",
+    "query": "checkout timeout",
+    "setupEvents": [
+      { "eventType": "edit", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout" } },
+      { "eventType": "failure", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout", "message": "Gateway timeout" } }
+    ],
+    "expectedGraphIncludes": ["src/retry.js::shouldRetry", "src/checkout.ts"]
+  }
+]

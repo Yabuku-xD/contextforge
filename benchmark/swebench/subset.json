@@ -1,0 +1,45 @@
+[
+  {
+    "id": "swe_checkout_timeout",
+    "issue": "Gateway timeouts are surfacing during checkout. Find the likely source quickly.",
+    "kind": "search",
+    "query": "checkout timeout",
+    "expectedTop": "src/checkout.ts::createCheckout"
+  },
+  {
+    "id": "swe_retry_blast_radius",
+    "issue": "A retry change may have changed payment behavior. Show the likely blast radius.",
+    "kind": "impact",
+    "query": "shouldRetry",
+    "expectedIncludes": ["src/checkout.ts::createCheckout"]
+  },
+  {
+    "id": "swe_auth_entrypoint",
+    "issue": "The auth middleware is probably the entrypoint for bad session parsing.",
+    "kind": "search",
+    "query": "auth middleware",
+    "expectedTop": "src/auth.js::parseSession"
+  },
+  {
+    "id": "swe_delayed_failure_trace",
+    "issue": "Trace the delayed checkout failure back to the last relevant edit.",
+    "kind": "why",
+    "query": "checkout timeout",
+    "setupEvents": [
+      { "eventType": "edit", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout" } },
+      { "eventType": "failure", "payload": { "filePath": "src/checkout.ts", "symbolId": "createCheckout", "message": "Gateway timeout" } }
+    ],
+    "expectedSessionMin": 1
+  },
+  {
+    "id": "swe_decision_resume",
+    "issue": "A debugging run was interrupted. Recover the working context around the retry path.",
+    "kind": "session",
+    "query": "retry path",
+    "setupEvents": [
+      { "eventType": "decision", "payload": { "decision": "Investigate retry path first" } },
+      { "eventType": "note", "payload": { "message": "Checkout timeout only appears after the retry branch kicks in." } }
+    ],
+    "expectedSessionMin": 1
+  }
+]

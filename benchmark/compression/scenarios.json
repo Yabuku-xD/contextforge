@@ -1,0 +1,23 @@
+[
+  {
+    "id": "compression_log",
+    "name": "log",
+    "filePath": "checkout.log",
+    "content": "2026-01-01 INFO checkout started\n2026-01-01 INFO checkout started\n2026-01-01 WARN retry scheduled\n2026-01-01 WARN retry scheduled\n2026-01-01 ERROR timeout while talking to gateway",
+    "requireFidelity": true
+  },
+  {
+    "id": "compression_dom_snapshot",
+    "name": "dom_snapshot",
+    "filePath": "snapshot.html",
+    "content": "<button id=\"checkout-submit\" data-testid=\"checkout-submit\" aria-label=\"Submit order\">Submit</button>\n<div class=\"error\">Gateway timeout</div>",
+    "requireFidelity": true
+  },
+  {
+    "id": "compression_json_exact",
+    "name": "json_exact",
+    "filePath": "response.json",
+    "content": "{\"status\":\"timeout\",\"attempt\":3,\"paymentId\":\"pay_123\"}",
+    "requireFidelity": true
+  }
+]

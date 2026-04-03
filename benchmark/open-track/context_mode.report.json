@@ -1,0 +1,45 @@
+{
+  "name": "context_mode",
+  "available": true,
+  "source": "mcp_context_mode_manual_run",
+  "summary": {
+    "startup": {
+      "avgTokensBeforeUsefulAction": 80,
+      "avgLatencyMs": null,
+      "avgFilesRead": 1
+    },
+    "compression": {
+      "fidelityRate": 1,
+      "avgTokenReduction": 0,
+      "avgLatencyMs": null
+    },
+    "retrieval": {
+      "hitAt1": 0.8333333333333334,
+      "hitAt5": 1,
+      "mrr": 0.9166666666666666,
+      "avgTokensToCorrectAnswer": 114,
+      "avgFilesRead": 2.1666666666666665,
+      "avgLatencyMs": null
+    },
+    "session": {
+      "recallAtK": 1,
+      "correctnessRate": 1,
+      "falseCausalLinkRate": 0,
+      "avgLatencyMs": null
+    },
+    "endToEnd": {
+      "successRate": 1,
+      "tokensPerSuccessfulTask": 176,
+      "startupCost": 80,
+      "steadyStateCost": 96,
+      "filesReadPerSuccessfulTask": 2,
+      "avgLatencyMs": null
+    }
+  },
+  "notes": [
+    "Generated on 2026-04-03 from manual MCP context-mode runs against tests/fixtures/sample-app.",
+    "Startup cost is based on the first repo-inspection response needed to locate relevant files, counted from returned rg-style evidence rather than hidden server-side indexing.",
+    "Retrieval and end-to-end costs count full returned sections from ctx_batch_execute search results until the correct answer first appears.",
+    "Session scenarios were benchmarked by indexing the provided setup events as a searchable session.log section because context-mode does not provide native causal session memory."
+  ]
+}

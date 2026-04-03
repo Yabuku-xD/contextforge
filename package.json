@@ -1,0 +1,43 @@
+{
+  "name": "contextforge",
+  "version": "0.1.0",
+  "description": "Claude-first context optimizer for code agents",
+  "license": "MIT",
+  "homepage": "https://github.com/Yabuku-xD/contextforge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yabuku-xD/contextforge.git"
+  },
+  "type": "module",
+  "main": "src/cli.js",
+  "bin": {
+    "contextforge": "./src/cli.js",
+    "contextforge-mcp": "./src/mcp-server.js"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "bench": "node ./src/cli.js benchmark ./tests/fixtures/sample-app",
+    "bench:repo": "node ./src/cli.js benchmark .",
+    "compare": "node ./src/cli.js compare ./tests/fixtures/sample-app",
+    "gate": "node ./src/cli.js gate ./tests/fixtures/sample-app",
+    "swebench": "node ./src/cli.js swebench ./tests/fixtures/sample-app",
+    "blackbox": "node ./src/cli.js blackbox ./tests/fixtures/sample-app",
+    "phase3": "node ./src/cli.js phase3 ./tests/fixtures/sample-app",
+    "release": "node ./src/cli.js release ./tests/fixtures/sample-app",
+    "scoreboard": "node ./src/cli.js scoreboard ./tests/fixtures/sample-app",
+    "mcp": "node ./src/mcp-server.js --root ./tests/fixtures/sample-app",
+    "doctor": "node ./src/cli.js doctor",
+    "index": "node ./src/cli.js index ./tests/fixtures/sample-app",
+    "search": "node ./src/cli.js search \"checkout timeout\" ./tests/fixtures/sample-app",
+    "report-status": "node ./src/cli.js report-status"
+  },
+  "dependencies": {
+    "@atjsh/llmlingua-2": "^2.0.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.8.0",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-javascript": "^0.23.1",
+    "tree-sitter-typescript": "^0.23.2",
+    "zod": "^4.3.6"
+  }
+}
