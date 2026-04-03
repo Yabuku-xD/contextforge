@@ -23,6 +23,8 @@ const additionalContext = `
   - forge_resume or forge_session: session continuity
   - forge_stats or forge_doctor: health and diagnostics
 
+  For initial repo-overview questions, answer from forge_scan or forge_understand first. Do not immediately fall back to manually reading many files unless the user explicitly asks for a deeper drilldown or the ContextForge result is insufficient.
+
   Do not switch to another MCP for repo structure, architecture, impact, or session-memory work unless ContextForge is unavailable or insufficient for the task.
 </contextforge_routing>`.trim();
 

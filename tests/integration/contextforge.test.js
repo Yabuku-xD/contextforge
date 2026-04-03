@@ -55,6 +55,8 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(overview.topLevel.length > 0);
     assert.ok(overview.importantFiles.length > 0);
     assert.match(overview.summary, /Important files to read first/i);
+    assert.equal(overview.mode, "inventory_first");
+    assert.match(overview.guidance, /first-pass repository overview/i);
   } finally {
     forge.close();
   }

@@ -546,6 +546,13 @@ export class ContextForge {
       query: normalizedQuery,
       summary,
       mode: "inventory_first",
+      guidance: "Use this as the first-pass repository overview. Drill into individual files only if the user asks for more detail or the inventory is insufficient.",
+      coverage: [
+        "top_level_structure",
+        "package_manifest",
+        "entrypoints",
+        "important_files"
+      ],
       packageInfo,
       rootFiles,
       topLevel,
