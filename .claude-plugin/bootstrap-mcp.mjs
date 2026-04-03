@@ -36,6 +36,7 @@ function resolveLaunchPlan() {
       packageName,
       version: packageVersion,
       repoRoot: pluginRoot,
+      dependencyRoot: pluginRoot,
       serverPath: localServerPath,
       cacheRoot: null,
       installNeeded: false,
@@ -53,22 +54,23 @@ function resolveLaunchPlan() {
     version: packageVersion,
     repoRoot: pluginRoot,
     cacheRoot,
+    dependencyRoot: cacheRoot,
     serverPath: cachedServerPath,
-    installNeeded: !hasRuntimeDependencies(cachedPackageRoot),
+    installNeeded: !hasRuntimeDependencies(cachedPackageRoot, cacheRoot),
     installSpec: buildInstallSpec(packageMeta)
   };
 }
 
-function hasRuntimeDependencies(rootDir) {
-  if (!rootDir || !fs.existsSync(rootDir)) {
+function hasRuntimeDependencies(packageRoot, dependencyRoot = packageRoot) {
+  if (!packageRoot || !dependencyRoot || !fs.existsSync(packageRoot) || !fs.existsSync(dependencyRoot)) {
     return false;
   }
 
   const requiredPaths = [
-    path.join(rootDir, "src", "mcp-server.js"),
-    path.join(rootDir, "node_modules", "@modelcontextprotocol", "sdk"),
-    path.join(rootDir, "node_modules", "tree-sitter"),
-    path.join(rootDir, "node_modules", "zod")
+    path.join(packageRoot, "src", "mcp-server.js"),
+    path.join(dependencyRoot, "node_modules", "@modelcontextprotocol", "sdk"),
+    path.join(dependencyRoot, "node_modules", "tree-sitter"),
+    path.join(dependencyRoot, "node_modules", "zod")
   ];
 
   return requiredPaths.every((entry) => fs.existsSync(entry));
@@ -116,7 +118,7 @@ function ensureRuntimeInstall(plan) {
   });
 
   const installOutput = [result.stdout, result.stderr].filter(Boolean).join("");
-  if (installOutput) {
+  if (installOutput && (result.status !== 0 || process.env.CONTEXTFORGE_BOOTSTRAP_DEBUG === "1")) {
     process.stderr.write(installOutput);
   }
 
@@ -124,7 +126,7 @@ function ensureRuntimeInstall(plan) {
     throw new Error(`ContextForge runtime install failed with exit code ${result.status ?? "unknown"}`);
   }
 
-  if (!hasRuntimeDependencies(path.join(plan.cacheRoot, "node_modules", packageName))) {
+  if (!hasRuntimeDependencies(path.join(plan.cacheRoot, "node_modules", packageName), plan.cacheRoot)) {
     throw new Error("ContextForge runtime install completed, but the cached package is incomplete");
   }
 }
