@@ -7,18 +7,26 @@ const COMPLEX_HINTS = [
   "refactor",
   "architecture",
   "project structure",
+  "repo structure",
   "whole project",
   "entire project",
   "entire repo",
   "entire repository",
   "full codebase",
+  "monorepo",
   "codebase exploration",
   "comprehensive",
   "all files",
   "every file",
   "every single file",
+  "go through",
+  "directory",
+  "directories",
+  "folder",
   "folders",
+  "subfolder",
   "subfolders",
+  "package",
   "packages",
   "why does",
   "why is",
@@ -49,6 +57,10 @@ export function classifyTask(message) {
   }
 
   const lowered = text.toLowerCase();
+  if (isBroadRepoPrompt(lowered)) {
+    return { label: "complex", confidence: 0.9, reason: "broad_repo_prompt" };
+  }
+
   const complexHits = COMPLEX_HINTS.filter((term) => lowered.includes(term)).length;
   let complexityScore = complexHits;
 
@@ -71,4 +83,13 @@ export function classifyTask(message) {
   }
 
   return { label: "simple", confidence: 0.7, reason: "default_simple" };
+}
+
+function isBroadRepoPrompt(lowered) {
+  const repoTarget = /\b(project|repo|repository|monorepo|codebase|structure)\b/.test(lowered);
+  const broadIntent = /\b(understand|explain|overview|map|summarize|walk through|go through|analyze)\b/.test(lowered);
+  const exhaustiveScope = /\b(all|every|entire|whole|complete|comprehensive)\b/.test(lowered);
+  const fileTreeTerms = /\b(files?|folders?|subfolders?|directories|packages?)\b/.test(lowered);
+
+  return (repoTarget && broadIntent) || (exhaustiveScope && fileTreeTerms);
 }

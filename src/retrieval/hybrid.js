@@ -52,6 +52,7 @@ export function hybridSearch({
       current.score = fusedScores.get(item.id) ?? current.score;
       current.sources = [...new Set([...current.sources, item.kind])];
       current.lexicalScore = lexicalScore({ label: current.label, text: current.text }, query);
+      current.structuralScore = structuralScore(current.label);
       current.raptorBonus = Math.max(current.raptorBonus ?? 0, kindBias(item.kind, raptorPlan.strategy));
       current.raptorStrategy = raptorPlan.strategy;
       merged.set(item.id, current);
@@ -59,7 +60,7 @@ export function hybridSearch({
   }
 
   let results = [...merged.values()]
-    .sort((left, right) => (right.score + (right.lexicalScore ?? 0) * 0.4 + (right.raptorBonus ?? 0)) - (left.score + (left.lexicalScore ?? 0) * 0.4 + (left.raptorBonus ?? 0)))
+    .sort((left, right) => (right.score + (right.lexicalScore ?? 0) * 0.4 + (right.structuralScore ?? 0) + (right.raptorBonus ?? 0)) - (left.score + (left.lexicalScore ?? 0) * 0.4 + (left.structuralScore ?? 0) + (left.raptorBonus ?? 0)))
     .slice(0, limit);
 
   if (useGraph) {
@@ -95,4 +96,21 @@ function kindBias(kind, strategy) {
   if (strategy === "traversal" && kind === "raptor_traversal") return 0.2;
   if (strategy === "flat") return -0.05;
   return 0;
+}
+
+function structuralScore(label) {
+  const depth = String(label ?? "").split("::").filter(Boolean).length;
+  if (!depth) {
+    return 0;
+  }
+
+  if (depth === 1) {
+    return 0.015;
+  }
+
+  if (depth === 2) {
+    return 0.02;
+  }
+
+  return Math.max(-0.01, 0.02 - (depth - 2) * 0.015);
 }

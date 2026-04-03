@@ -51,7 +51,7 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.filesIndexed > 0);
 
-    const overview = forge.understand("go through every single file folder and subfolder in this whole project and explain what they are doing");
+    const overview = forge.understand("Understand the entire contextforge monorepo structure - every file, folder, and subfolder, and explain what they are doing.");
     assert.ok(overview.topLevel.length > 0);
     assert.ok(overview.importantFiles.length > 0);
     assert.match(overview.summary, /Important files to read first/i);

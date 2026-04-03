@@ -10,13 +10,13 @@ import { rememberActiveSession, resolveRuntimeSessionId } from "./session/runtim
 
 const SERVER_INFO = {
   name: "contextforge",
-  version: "0.1.5"
+  version: "0.1.6"
 };
 
 const SERVER_INSTRUCTIONS = [
   "ContextForge is a Claude-first code-context server for repository search, architecture lookup, impact analysis, and session continuity.",
   "Use forge_start near the beginning of non-trivial tasks to establish paging and session state.",
-  "Use forge_understand first for broad prompts like understanding the whole project, folders, packages, or important files. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
+  "Use forge_understand first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
 ].join(" ");
 
 const INDEX_REQUIRED_TOOLS = new Set([

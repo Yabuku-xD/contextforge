@@ -1002,7 +1002,7 @@ export class ContextForge {
 
   _startupPreloadPlan(message, task) {
     const lowered = String(message ?? "").toLowerCase();
-    const broadExplore = /\b(project structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|packages|folders|subfolders|overview|understand)\b/.test(lowered);
+    const broadExplore = /\b(project structure|repo structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|monorepo|package|packages|folder|folders|subfolder|subfolders|directory|directories|overview|understand)\b/.test(lowered);
     if (task.loadStrategy === "minimal") {
       return {
         name: "minimal_brief",
