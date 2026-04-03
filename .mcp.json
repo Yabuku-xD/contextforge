@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "github:Yabuku-xD/contextforge#v0.1.8",
+        "github:Yabuku-xD/contextforge#v0.1.9",
         "mcp-stdio"
       ],
       "env": {

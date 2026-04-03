@@ -510,6 +510,7 @@ export class ContextForge {
       .map((file) => file.relativePath)
       .sort((left, right) => left.localeCompare(right));
     const packageInfo = this._readPackageInfo();
+    const packages = this._discoverWorkspacePackages(inventory.files, packageInfo);
     const entrypoints = this._detectEntrypoints(inventory.files, packageInfo);
     const architecture = this._summarizeArchitecture({
       files: inventory.files,
@@ -524,6 +525,7 @@ export class ContextForge {
     }).slice(0, 10);
     const summary = this._buildUnderstandSummary({
       packageInfo,
+      packages,
       topLevel,
       rootFiles,
       entrypoints,
@@ -537,6 +539,7 @@ export class ContextForge {
       payload: {
         query: normalizedQuery,
         topLevelCount: topLevel.length,
+        packageCount: packages.length,
         importantFileCount: importantFiles.length,
         topEntrypoint: entrypoints[0]?.path ?? null
       }
@@ -550,10 +553,12 @@ export class ContextForge {
       coverage: [
         "top_level_structure",
         "package_manifest",
+        "workspace_packages",
         "entrypoints",
         "important_files"
       ],
       packageInfo,
+      packages,
       rootFiles,
       topLevel,
       entrypoints,
@@ -1193,6 +1198,55 @@ export class ContextForge {
       .slice(0, 10);
   }
 
+  _discoverWorkspacePackages(files, packageInfo) {
+    const packageFiles = files
+      .map((file) => file.relativePath)
+      .filter((relativePath) => relativePath !== "package.json" && relativePath.endsWith("/package.json"));
+
+    const workspacePatterns = packageInfo?.workspaces ?? [];
+    const filtered = packageFiles.filter((relativePath) => {
+      if (!workspacePatterns.length) {
+        return relativePath.split("/").length <= 3;
+      }
+
+      return workspacePatterns.some((pattern) => matchesWorkspacePattern(relativePath, pattern));
+    });
+
+    return filtered
+      .map((relativePath) => {
+        const manifestPath = path.join(this.rootDir, relativePath);
+        try {
+          const manifest = JSON.parse(readText(manifestPath));
+          return {
+            path: relativePath.replace(/\/package\.json$/, ""),
+            manifestPath: relativePath,
+            name: manifest.name ?? path.basename(path.dirname(manifestPath)),
+            version: manifest.version ?? null,
+            description: manifest.description ?? null,
+            private: Boolean(manifest.private),
+            main: manifest.main ?? null,
+            types: manifest.types ?? null,
+            bin: typeof manifest.bin === "string"
+              ? { [manifest.name ?? "bin"]: manifest.bin }
+              : manifest.bin ?? {}
+          };
+        } catch {
+          return {
+            path: relativePath.replace(/\/package\.json$/, ""),
+            manifestPath: relativePath,
+            name: path.basename(path.dirname(manifestPath)),
+            version: null,
+            description: null,
+            private: false,
+            main: null,
+            types: null,
+            bin: {}
+          };
+        }
+      })
+      .sort((left, right) => left.path.localeCompare(right.path));
+  }
+
   _rankImportantFiles({ files, query, packageInfo, state = null }) {
     const symbolCounts = new Map();
     const edgeCounts = new Map();
@@ -1325,17 +1379,21 @@ export class ContextForge {
     return [...entryGroups, ...workspaceGroups, ...fallbackRoot].slice(0, 12);
   }
 
-  _buildUnderstandSummary({ packageInfo, topLevel, rootFiles, entrypoints, importantFiles }) {
+  _buildUnderstandSummary({ packageInfo, packages, topLevel, rootFiles, entrypoints, importantFiles }) {
     const folderText = topLevel.slice(0, 6).map((item) => `${item.path} (${item.fileCount} files)`).join(", ");
     const entryText = entrypoints.slice(0, 4).map((item) => item.path).join(", ");
     const importantText = importantFiles.slice(0, 5).map((item) => item.path).join(", ");
-    const packageText = packageInfo?.name
+    const workspaceText = packages?.length
+      ? `Workspace packages: ${packages.slice(0, 6).map((pkg) => pkg.name ?? pkg.path).join(", ")}${packages.length > 6 ? `, and ${packages.length - 6} more` : ""}.`
+      : null;
+    const manifestText = packageInfo?.name
       ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
       : "no package manifest detected";
 
     return [
-      `Package: ${packageText}.`,
+      `Package: ${manifestText}.`,
       topLevel.length ? `Top-level layout: ${folderText}.` : "Top-level layout: no indexed files.",
+      workspaceText,
       entrypoints.length ? `Likely entrypoints: ${entryText}.` : null,
       rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
       importantFiles.length ? `Important files to read first: ${importantText}.` : null
@@ -1446,4 +1504,20 @@ function guessFolderPurpose(folderName, languages = []) {
   if (languages.includes("markdown")) return "documentation-heavy area";
   if (languages.includes("javascript") || languages.includes("typescript")) return "code-heavy module area";
   return "project area grouped by responsibility";
+}
+
+function matchesWorkspacePattern(relativePath, pattern) {
+  const normalizedPath = String(relativePath ?? "").replace(/\\/g, "/");
+  const normalizedPattern = String(pattern ?? "").replace(/\\/g, "/").replace(/\/package\.json$/, "");
+  const packageDir = normalizedPath.replace(/\/package\.json$/, "");
+
+  if (!normalizedPattern.includes("*")) {
+    return packageDir === normalizedPattern;
+  }
+
+  const escaped = normalizedPattern
+    .split("*")
+    .map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("[^/]+");
+  return new RegExp(`^${escaped}$`).test(packageDir);
 }
