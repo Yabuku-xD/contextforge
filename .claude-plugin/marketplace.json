@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "ContextForge marketplace for Claude Code",
-    "version": "0.1.3"
+    "version": "0.1.4"
   },
   "plugins": [
     {
       "name": "contextforge",
       "source": "./",
       "description": "Context engine for code agents with retrieval, scope, impact, and session memory",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "author": {
         "name": "Yabuku-xD"
       },

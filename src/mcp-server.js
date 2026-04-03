@@ -10,7 +10,7 @@ import { rememberActiveSession, resolveRuntimeSessionId } from "./session/runtim
 
 const SERVER_INFO = {
   name: "contextforge",
-  version: "0.1.3"
+  version: "0.1.4"
 };
 
 const SERVER_INSTRUCTIONS = [

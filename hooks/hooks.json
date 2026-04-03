@@ -1,0 +1,16 @@
+{
+  "description": "ContextForge hooks — SessionStart routing guidance for repo understanding, architecture, impact analysis, and session continuity",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
