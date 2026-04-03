@@ -35,11 +35,20 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
       name: "forge_search",
       arguments: {
         query: "checkout timeout",
-        limit: 3
+        limit: "3"
       }
     });
     assert.ok(!search.isError);
     assert.match(search.content[0].text, /checkout/i);
+
+    const scope = await client.callTool({
+      name: "forge_scope",
+      arguments: {
+        query: "project structure and architecture overview",
+        mode: "collapsed"
+      }
+    });
+    assert.ok(!scope.isError);
   } finally {
     await client.close();
     await transport.close();

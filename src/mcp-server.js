@@ -10,7 +10,7 @@ import { rememberActiveSession, resolveRuntimeSessionId } from "./session/runtim
 
 const SERVER_INFO = {
   name: "contextforge",
-  version: "0.1.2"
+  version: "0.1.3"
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -26,14 +26,6 @@ const INDEX_REQUIRED_TOOLS = new Set([
   "forge_impact",
   "forge_why",
   "forge_doctor"
-]);
-
-const LARGE_RESULT_TOOLS = new Set([
-  "forge_scope",
-  "forge_why",
-  "forge_search",
-  "forge_symbol",
-  "forge_impact"
 ]);
 
 export async function startMcpServer(argv = process.argv.slice(2)) {
@@ -60,10 +52,7 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
   for (const tool of Object.values(TOOL_REGISTRY)) {
     server.registerTool(tool.name, {
       description: tool.description,
-      inputSchema: buildToolSchema(tool.parameters),
-      _meta: LARGE_RESULT_TOOLS.has(tool.name)
-        ? { "anthropic/maxResultSizeChars": 120000 }
-        : undefined
+      inputSchema: buildToolSchema(tool.parameters)
     }, async (args = {}) => {
       if (INDEX_REQUIRED_TOOLS.has(tool.name)) {
         forge.indexRepository();
@@ -188,9 +177,9 @@ function schemaForDescriptor(descriptor) {
     case "number":
       return z.number();
     case "number?":
-      return z.number().optional();
+      return z.union([z.number(), z.string()]).optional();
     case "auto | collapsed | traversal ?":
-      return z.enum(["auto", "collapsed", "traversal"]).optional();
+      return z.string().optional();
     case "string | 'list'":
       return z.union([z.string(), z.literal("list")]).optional();
     default:
