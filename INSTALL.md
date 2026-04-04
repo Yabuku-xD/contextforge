@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.19`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.20`.
 
 ## What This Guide Covers
 

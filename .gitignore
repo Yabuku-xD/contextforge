@@ -1,3 +1,4 @@
 node_modules/
 .contextforge/
+.tmp-tests/
 .DS_Store
