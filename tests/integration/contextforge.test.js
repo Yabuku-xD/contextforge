@@ -10,6 +10,20 @@ import { recordSessionEvent } from "../../src/session/events.js";
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
 const repoRoot = path.resolve(".");
 
+function writableTempBase() {
+  const candidates = [os.tmpdir(), path.join(repoRoot, ".tmp-tests")];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(candidate, { recursive: true });
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("No writable temp directory available for tests.");
+}
+
 test("Phase 1 can index, search, analyze impact, and resume", async () => {
   const forge = createContextForge(sampleRepo, { sessionId: `test_session_${Date.now()}` });
   try {
@@ -57,23 +71,25 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(overview.topLevel.length > 0);
     assert.ok(overview.importantFiles.length > 0);
     assert.match(overview.summary, /Important files to read first|representative files/i);
-    assert.match(overview.mode, /inventory_(first|walk)/);
-    assert.match(overview.guidance, /first-pass repository overview|deeper repository map/i);
+    assert.match(overview.mode, /inventory_(first|walk)|exhaustive_walk/);
+    assert.match(overview.guidance, /first-pass repository overview|deeper repository map|exhaustive repository digest/i);
 
     const walk = forge.walk("Go through every single file, folder, and subfolder in this project and explain what each major area does.");
-    assert.equal(walk.mode, "inventory_walk");
+    assert.equal(walk.mode, "exhaustive_walk");
     assert.ok(walk.directorySections.length > 0);
-    assert.match(walk.guidance, /deeper repository map/i);
+    assert.ok(walk.audit.fileCountInspected > 0);
+    assert.match(walk.guidance, /exhaustive repository digest/i);
+    assert.match(walk.summary, /inspected .* repository files locally/i);
 
     const routed = forge.understand("Go through every single file, folder, and subfolder in this project.");
-    assert.equal(routed.mode, "inventory_walk");
+    assert.equal(routed.mode, "exhaustive_walk");
   } finally {
     forge.close();
   }
 });
 
 test("ContextForge native file ops handle read write edit directory and bash flows", async () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-fileops-"));
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-fileops-"));
   fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "fileops-fixture", version: "1.0.0" }, null, 2));
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export function run() {\n  return 'hello';\n}\n");

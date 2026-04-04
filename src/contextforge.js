@@ -55,6 +55,7 @@ export class ContextForge {
     this.repoFingerprint = null;
     this._repoState = null;
     this._repoInventory = null;
+    this._repoAudit = null;
     this._filePathById = null;
   }
 
@@ -569,22 +570,26 @@ export class ContextForge {
 
   walk(query = "") {
     const normalizedQuery = String(query ?? "").trim();
+    const exhaustive = this._shouldUseExhaustiveWalk(normalizedQuery);
     const overview = this._buildInventoryOverview(normalizedQuery, {
       fallbackQuery: "project structure architecture packages directories responsibilities important files representative files"
     });
+    const audit = exhaustive ? this._loadRepoAudit() : null;
     const packageSections = this._buildPackageSections({
       files: overview.files,
       packages: overview.packages,
       entrypoints: overview.entrypoints,
       query: normalizedQuery,
-      packageInfo: overview.packageInfo
+      packageInfo: overview.packageInfo,
+      audit
     });
     const directorySections = this._buildDirectorySections({
       files: overview.files,
       topLevel: overview.topLevel,
       packages: overview.packages,
       query: normalizedQuery,
-      packageInfo: overview.packageInfo
+      packageInfo: overview.packageInfo,
+      audit
     });
     const summary = this._buildWalkSummary({
       packageInfo: overview.packageInfo,
@@ -592,7 +597,9 @@ export class ContextForge {
       packageSections,
       directorySections,
       rootFiles: overview.rootFiles,
-      importantFiles: overview.importantFiles
+      importantFiles: overview.importantFiles,
+      audit,
+      exhaustive
     });
 
     recordSessionEvent(this.db, {
@@ -605,24 +612,41 @@ export class ContextForge {
         packageCount: overview.packages.length,
         packageSectionCount: packageSections.length,
         directorySectionCount: directorySections.length,
-        routedMode: "inventory_walk"
+        routedMode: exhaustive ? "exhaustive_walk" : "inventory_walk",
+        auditedFileCount: audit?.fileCountInspected ?? 0,
+        auditedTextFileCount: audit?.textFileCount ?? 0
       }
     });
 
     return {
       query: normalizedQuery,
       summary,
-      mode: "inventory_walk",
-      guidance: "Use this as the deeper repository map before spawning subagents or manually reading many files. Answer from these sections first, then drill into specific files only if the user asks or a section is ambiguous.",
-      coverage: [
-        "top_level_structure",
-        "package_manifest",
-        "workspace_packages",
-        "directory_sections",
-        "representative_files",
-        "entrypoints",
-        "important_files"
-      ],
+      mode: exhaustive ? "exhaustive_walk" : "inventory_walk",
+      guidance: exhaustive
+        ? "Use this as the exhaustive repository digest. ContextForge inspected every repository file locally and grouped the findings by package and directory so you can answer whole-project questions without manually crawling file bodies first."
+        : "Use this as the deeper repository map before spawning subagents or manually reading many files. Answer from these sections first, then drill into specific files only if the user asks or a section is ambiguous.",
+      coverage: exhaustive
+        ? [
+            "top_level_structure",
+            "package_manifest",
+            "workspace_packages",
+            "directory_sections",
+            "representative_files",
+            "entrypoints",
+            "important_files",
+            "all_repository_files_locally_inspected",
+            "file_body_audit",
+            "role_breakdown"
+          ]
+        : [
+            "top_level_structure",
+            "package_manifest",
+            "workspace_packages",
+            "directory_sections",
+            "representative_files",
+            "entrypoints",
+            "important_files"
+          ],
       packageInfo: overview.packageInfo,
       packages: overview.packages,
       rootFiles: overview.rootFiles,
@@ -631,7 +655,18 @@ export class ContextForge {
       architecture: overview.architecture,
       importantFiles: overview.importantFiles,
       packageSections,
-      directorySections
+      directorySections,
+      audit: audit
+        ? {
+            fileCountInspected: audit.fileCountInspected,
+            textFileCount: audit.textFileCount,
+            binaryFileCount: audit.binaryFileCount,
+            generatedFileCount: audit.generatedFileCount,
+            vendorFileCount: audit.vendorFileCount,
+            roleBreakdown: audit.roleBreakdown,
+            binarySamples: audit.binarySamples
+          }
+        : undefined
     };
   }
 
@@ -1252,6 +1287,7 @@ export class ContextForge {
   _invalidateRepoCaches() {
     this._repoState = null;
     this._repoInventory = null;
+    this._repoAudit = null;
     this._filePathById = null;
     for (const key of REPO_STATE_CACHE.keys()) {
       if (key.startsWith(`${this.repoId}:`)) {
@@ -1382,6 +1418,37 @@ export class ContextForge {
     const files = loadRepositoryInventory(this.rootDir, this.repoId);
     this._repoInventory = { files };
     return this._repoInventory;
+  }
+
+  _loadRepoAudit() {
+    if (this._repoAudit) {
+      return this._repoAudit;
+    }
+
+    const inventory = this._loadRepoInventory();
+    const fileDigests = inventory.files.map((file) => inspectRepositoryFile(file));
+    const textFileCount = fileDigests.filter((file) => file.isText).length;
+    const binaryFileCount = fileDigests.length - textFileCount;
+    const generatedFileCount = fileDigests.filter((file) => file.isGenerated).length;
+    const vendorFileCount = fileDigests.filter((file) => file.isVendor).length;
+
+    this._repoAudit = {
+      fileCountInspected: fileDigests.length,
+      textFileCount,
+      binaryFileCount,
+      generatedFileCount,
+      vendorFileCount,
+      roleBreakdown: summarizeRoleBreakdown(fileDigests, 8),
+      binarySamples: fileDigests
+        .filter((file) => !file.isText)
+        .slice(0, 6)
+        .map((file) => ({
+          path: file.path,
+          role: file.role
+        })),
+      fileDigests
+    };
+    return this._repoAudit;
   }
 
   _resolveWorkspacePath(targetPath, options = {}) {
@@ -1754,10 +1821,19 @@ export class ContextForge {
     return /\b(every single file|every file|all files|all folders|all directories|every folder|every directory|subfolder|subfolders|drill into each package|comprehensive understanding|comprehensive repo|go through every|walk the repo|walk through the repo|walk the project|whole monorepo|entire monorepo)\b/.test(lowered);
   }
 
-  _buildPackageSections({ files, packages, entrypoints, query, packageInfo }) {
+  _shouldUseExhaustiveWalk(query) {
+    const lowered = String(query ?? "").toLowerCase();
+    return /\b(every single file|every file|all files|go through every|go through each|each file|each module|comprehensive understanding|full audit|audit the repo|entire monorepo)\b/.test(lowered);
+  }
+
+  _buildPackageSections({ files, packages, entrypoints, query, packageInfo, audit = null }) {
+    const digestByPath = audit ? new Map(audit.fileDigests.map((digest) => [digest.path, digest])) : null;
     return packages
       .map((pkg) => {
         const packageFiles = files.filter((file) => file.relativePath.startsWith(`${pkg.path}/`));
+        const packageDigests = audit
+          ? audit.fileDigests.filter((file) => file.path.startsWith(`${pkg.path}/`))
+          : [];
         const packageTopLevel = this._summarizeTopLevel(packageFiles);
         const representativeFiles = this._rankImportantFiles({
           files: packageFiles,
@@ -1781,11 +1857,26 @@ export class ContextForge {
           description: pkg.description,
           purpose: pkg.description ?? guessFolderPurpose(path.basename(pkg.path), languages),
           fileCount: packageFiles.length,
+          auditedFiles: packageDigests.length || undefined,
+          textFiles: packageDigests.length ? packageDigests.filter((file) => file.isText).length : undefined,
+          binaryFiles: packageDigests.length ? packageDigests.filter((file) => !file.isText).length : undefined,
+          roleBreakdown: packageDigests.length ? summarizeRoleBreakdown(packageDigests, 5) : undefined,
           languages,
           directFiles,
           entrypoints: packageEntrypoints,
           subdirectories,
           representativeFiles,
+          notableFiles: digestByPath
+            ? representativeFiles
+              .slice(0, 3)
+              .map((item) => digestByPath.get(item.path))
+              .filter(Boolean)
+              .map((item) => ({
+                path: item.path,
+                role: item.role,
+                summary: item.summary
+              }))
+            : undefined,
           topLevelSamples: packageTopLevel
             .filter((item) => item.path !== ".")
             .slice(0, 4)
@@ -1799,11 +1890,15 @@ export class ContextForge {
       .sort((left, right) => right.fileCount - left.fileCount || left.path.localeCompare(right.path));
   }
 
-  _buildDirectorySections({ files, topLevel, packages, query, packageInfo }) {
+  _buildDirectorySections({ files, topLevel, packages, query, packageInfo, audit = null }) {
+    const digestByPath = audit ? new Map(audit.fileDigests.map((digest) => [digest.path, digest])) : null;
     return topLevel
       .filter((item) => item.path !== ".")
       .map((item) => {
         const directoryFiles = files.filter((file) => file.relativePath.startsWith(`${item.path}/`));
+        const directoryDigests = audit
+          ? audit.fileDigests.filter((file) => file.path.startsWith(`${item.path}/`))
+          : [];
         const representativeFiles = this._rankImportantFiles({
           files: directoryFiles,
           query: query || `${item.path} directory purpose representative files`,
@@ -1822,11 +1917,26 @@ export class ContextForge {
           path: item.path,
           purpose: guessFolderPurpose(path.basename(item.path), item.languages),
           fileCount: item.fileCount,
+          auditedFiles: directoryDigests.length || undefined,
+          textFiles: directoryDigests.length ? directoryDigests.filter((file) => file.isText).length : undefined,
+          binaryFiles: directoryDigests.length ? directoryDigests.filter((file) => !file.isText).length : undefined,
+          roleBreakdown: directoryDigests.length ? summarizeRoleBreakdown(directoryDigests, 5) : undefined,
           languages: item.languages,
           samples: item.samples,
           workspacePackages,
           subdirectories: this._summarizeScopedSubdirectories(files, item.path, 6),
-          representativeFiles
+          representativeFiles,
+          notableFiles: digestByPath
+            ? representativeFiles
+              .slice(0, 3)
+              .map((entry) => digestByPath.get(entry.path))
+              .filter(Boolean)
+              .map((entry) => ({
+                path: entry.path,
+                role: entry.role,
+                summary: entry.summary
+              }))
+            : undefined
         };
       })
       .sort((left, right) => right.fileCount - left.fileCount || left.path.localeCompare(right.path));
@@ -1879,7 +1989,7 @@ export class ContextForge {
       .slice(0, limit);
   }
 
-  _buildWalkSummary({ packageInfo, topLevel, packageSections, directorySections, rootFiles, importantFiles }) {
+  _buildWalkSummary({ packageInfo, topLevel, packageSections, directorySections, rootFiles, importantFiles, audit = null, exhaustive = false }) {
     const manifestText = packageInfo?.name
       ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
       : "no package manifest detected";
@@ -1891,15 +2001,25 @@ export class ContextForge {
       ? `Top-level areas include ${directorySections.slice(0, 4).map((section) => section.path).join(", ")}${directorySections.length > 4 ? `, and ${directorySections.length - 4} more` : ""}.`
       : null;
     const importantText = importantFiles.slice(0, 5).map((item) => item.path).join(", ");
+    const auditText = audit
+      ? `Exhaustive audit inspected ${audit.fileCountInspected} repository files locally (${audit.textFileCount} text bodies, ${audit.binaryFileCount} binary assets).`
+      : null;
+    const roleText = audit?.roleBreakdown?.length
+      ? `Most common file roles: ${audit.roleBreakdown.slice(0, 4).map((entry) => `${entry.role} (${entry.count})`).join(", ")}.`
+      : null;
 
     return [
       `Package: ${manifestText}.`,
       topLevel.length ? `Top-level layout: ${topLevelText}.` : "Top-level layout: no indexed files.",
+      auditText,
       packageText,
       directoryText,
+      roleText,
       rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
       importantFiles.length ? `Start with these representative files: ${importantText}.` : null,
-      "This pass summarizes each major area with representative files so you can answer broad repo questions without crawling every file body first."
+      exhaustive
+        ? "This pass still returns a compact digest, but it did inspect every repository file locally before grouping the findings by package and directory."
+        : "This pass summarizes each major area with representative files so you can answer broad repo questions without crawling every file body first."
     ].filter(Boolean).join(" ");
   }
 
@@ -2114,4 +2234,175 @@ function buildCommandSummary({ command, cwd, exitCode, timedOut, stdout, stderr 
   const location = cwd === "." ? "repository root" : cwd;
 
   return `Ran "${command}" in ${location}. Command ${status}. stdout lines: ${stdoutLines}. stderr lines: ${stderrLines}.`;
+}
+
+function inspectRepositoryFile(file) {
+  const buffer = fs.readFileSync(file.absolutePath);
+  const binary = looksBinary(buffer, file.relativePath);
+
+  if (binary) {
+    return {
+      path: file.relativePath,
+      language: file.language,
+      role: inferFileRole(file.relativePath, "", file.language, file, { isBinary: true }),
+      summary: `${file.relativePath}: binary or non-text asset skipped from text parsing.`,
+      isText: false,
+      isGenerated: Boolean(file.isGenerated),
+      isVendor: Boolean(file.isVendor),
+      bytes: buffer.length,
+      lineCount: 0,
+      importCount: 0,
+      exportCount: 0,
+      headingCount: 0
+    };
+  }
+
+  const content = buffer.toString("utf8");
+  const lines = normalizeFileLines(content);
+  const lineCount = lines.length;
+  const importCount = countRegexMatches(content, /^\s*import\b/gm);
+  const exportCount = countRegexMatches(content, /^\s*export\b/gm);
+  const headingCount = countRegexMatches(content, /^#{1,6}\s+/gm);
+  const role = inferFileRole(file.relativePath, content, file.language, file, { isBinary: false });
+  const topKeys = file.language === "json" ? extractJsonTopLevelKeys(content) : [];
+  const summary = summarizeFileDigest({
+    path: file.relativePath,
+    role,
+    language: file.language,
+    lineCount,
+    importCount,
+    exportCount,
+    headingCount,
+    topKeys,
+    isGenerated: Boolean(file.isGenerated),
+    isVendor: Boolean(file.isVendor)
+  });
+
+  return {
+    path: file.relativePath,
+    language: file.language,
+    role,
+    summary,
+    isText: true,
+    isGenerated: Boolean(file.isGenerated),
+    isVendor: Boolean(file.isVendor),
+    bytes: buffer.length,
+    lineCount,
+    importCount,
+    exportCount,
+    headingCount
+  };
+}
+
+function summarizeRoleBreakdown(fileDigests, limit = 6) {
+  const counts = new Map();
+  for (const file of fileDigests) {
+    counts.set(file.role, (counts.get(file.role) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([role, count]) => ({ role, count }))
+    .sort((left, right) => right.count - left.count || left.role.localeCompare(right.role))
+    .slice(0, limit);
+}
+
+function inferFileRole(relativePath, content, language, file, options = {}) {
+  const loweredPath = String(relativePath ?? "").toLowerCase();
+  const basename = path.basename(loweredPath);
+
+  if (options.isBinary) return "binary_asset";
+  if (file?.isVendor) return "vendor_asset";
+  if (file?.isGenerated || basename.endsWith(".d.ts")) return "generated_or_types";
+  if (basename === "package.json") return "package_manifest";
+  if (/^readme(\.|$)/i.test(basename)) return "readme";
+  if (/^(install|contributing|changelog|license|agents|claude)(\.|$)/i.test(basename)) return "documentation";
+  if (loweredPath.includes("/tests/") || loweredPath.includes("/test/") || /\.(test|spec)\./.test(loweredPath)) return "test";
+  if (loweredPath.includes("/fixture") || loweredPath.includes("/fixtures/")) return "fixture";
+  if (loweredPath.includes("/hooks/")) return "hook";
+  if (loweredPath.includes("/scripts/") || /^\#\!/.test(content)) return "script";
+  if (basename.includes("mcp-server") || /\bnew\s+McpServer\b/.test(content)) return "mcp_server";
+  if (basename.startsWith("cli.") || /\bprocess\.argv\b/.test(content)) return "cli_entrypoint";
+  if (loweredPath.includes("/src/tools/") || /^forge[_-]/.test(basename)) return "tool_module";
+  if (language === "markdown") return "documentation";
+  if (language === "json") return "config_or_data";
+  return "source_module";
+}
+
+function summarizeFileDigest({ path: filePath, role, language, lineCount, importCount, exportCount, headingCount, topKeys, isGenerated, isVendor }) {
+  if (role === "package_manifest") {
+    return `${filePath}: package manifest${topKeys.length ? ` with keys ${topKeys.join(", ")}` : ""}.`;
+  }
+  if (role === "readme" || role === "documentation") {
+    return `${filePath}: documentation${headingCount ? ` with ${headingCount} headings` : ""}.`;
+  }
+  if (role === "test") {
+    return `${filePath}: test coverage file (${lineCount} lines, ${importCount} imports).`;
+  }
+  if (role === "script") {
+    return `${filePath}: automation script (${lineCount} lines).`;
+  }
+  if (role === "hook") {
+    return `${filePath}: Claude or plugin hook module (${lineCount} lines).`;
+  }
+  if (role === "mcp_server") {
+    return `${filePath}: MCP server entrypoint (${lineCount} lines, ${exportCount} exports).`;
+  }
+  if (role === "cli_entrypoint") {
+    return `${filePath}: CLI entrypoint (${lineCount} lines, ${importCount} imports).`;
+  }
+  if (role === "tool_module") {
+    return `${filePath}: ContextForge tool module (${lineCount} lines, ${exportCount} exports).`;
+  }
+  if (role === "config_or_data") {
+    return `${filePath}: ${isVendor ? "vendor" : "config/data"} JSON${topKeys.length ? ` with keys ${topKeys.join(", ")}` : ""}.`;
+  }
+  if (role === "generated_or_types") {
+    return `${filePath}: generated or type-support file (${lineCount} lines).`;
+  }
+  const qualifiers = [];
+  if (isGenerated) qualifiers.push("generated");
+  if (isVendor) qualifiers.push("vendor");
+  if (language) qualifiers.push(language);
+  const qualifierText = qualifiers.length ? `${qualifiers.join(" ")} ` : "";
+  return `${filePath}: ${qualifierText}source module (${lineCount} lines, ${importCount} imports, ${exportCount} exports).`;
+}
+
+function extractJsonTopLevelKeys(content) {
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      return [];
+    }
+    return Object.keys(parsed).slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
+function countRegexMatches(text, pattern) {
+  if (!text) {
+    return 0;
+  }
+
+  const matches = text.match(pattern);
+  return matches ? matches.length : 0;
+}
+
+function looksBinary(buffer, filePath = "") {
+  const ext = path.extname(String(filePath ?? "").toLowerCase());
+  if ([
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".pdf", ".zip", ".gz", ".tar",
+    ".tgz", ".mp3", ".mp4", ".mov", ".avi", ".wasm", ".woff", ".woff2", ".ttf", ".otf"
+  ].includes(ext)) {
+    return true;
+  }
+
+  const sample = buffer.subarray(0, Math.min(buffer.length, 2048));
+  for (const byte of sample) {
+    if (byte === 0) {
+      return true;
+    }
+  }
+
+  return false;
 }

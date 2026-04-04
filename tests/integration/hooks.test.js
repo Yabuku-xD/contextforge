@@ -11,8 +11,22 @@ import { preCompact } from "../../hooks/pre-compact.js";
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
 
+function writableTempBase() {
+  const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(candidate, { recursive: true });
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("No writable temp directory available for hook tests.");
+}
+
 test("hooks reuse the active session across separate calls", async () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-hooks-"));
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-hooks-"));
   fs.cpSync(sampleRepo, tempRoot, { recursive: true });
   fs.rmSync(path.join(tempRoot, ".contextforge"), { recursive: true, force: true });
 

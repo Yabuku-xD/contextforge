@@ -6,8 +6,22 @@ import path from "node:path";
 
 import { installClaudeCodeProject } from "../../src/install/claude-code.js";
 
+function writableTempBase() {
+  const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(candidate, { recursive: true });
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("No writable temp directory available for install tests.");
+}
+
 test("installClaudeCodeProject creates or merges a Claude Code mcp config", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-install-"));
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-"));
   const configPath = path.join(tempDir, ".mcp.json");
 
   fs.writeFileSync(configPath, JSON.stringify({
