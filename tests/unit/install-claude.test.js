@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { installClaudeCodeProject } from "../../src/install/claude-code.js";
+import { installClaudeCodeProject, mergeClaudeCodePermissions } from "../../src/install/claude-code.js";
 
 function writableTempBase() {
   const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
@@ -79,4 +79,27 @@ test("installClaudeCodeProject can opt into mutation approvals and dontAsk mode"
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
+});
+
+test("mergeClaudeCodePermissions preserves existing project-local Claude settings", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-preserve-"));
+  const settingsPath = path.join(tempDir, ".claude", "settings.local.json");
+  fs.mkdirSync(path.join(tempDir, ".claude"), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({
+    enabledMcpjsonServers: ["contextforge"],
+    enableAllProjectMcpServers: true
+  }, null, 2));
+
+  const result = mergeClaudeCodePermissions(tempDir, {
+    allowMutations: false,
+    dontAsk: false
+  });
+  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+
+  assert.equal(result.defaultMode, null);
+  assert.deepEqual(settings.enabledMcpjsonServers, ["contextforge"]);
+  assert.equal(settings.enableAllProjectMcpServers, true);
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
 });

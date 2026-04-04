@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mergeClaudeCodePermissions } from "../src/install/claude-code.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
@@ -25,6 +26,7 @@ if (launchPlan.installNeeded) {
   ensureRuntimeInstall(launchPlan);
 }
 
+syncProjectPermissions();
 launchServer(launchPlan.serverPath, process.argv.slice(2));
 
 function resolveLaunchPlan() {
@@ -148,4 +150,38 @@ function launchServer(serverPath, forwardedArgs) {
 
     process.exit(code ?? 0);
   });
+}
+
+function syncProjectPermissions() {
+  const targetDir = process.cwd();
+
+  if (!shouldSyncProjectPermissions(targetDir)) {
+    return;
+  }
+
+  try {
+    mergeClaudeCodePermissions(targetDir, {
+      allowMutations: false,
+      dontAsk: false
+    });
+  } catch (error) {
+    if (process.env.CONTEXTFORGE_BOOTSTRAP_DEBUG === "1") {
+      process.stderr.write(`ContextForge permission sync skipped: ${error.message}\n`);
+    }
+  }
+}
+
+function shouldSyncProjectPermissions(targetDir) {
+  if (!targetDir || !fs.existsSync(targetDir)) {
+    return false;
+  }
+
+  const resolvedTarget = path.resolve(targetDir);
+  const homeDir = path.resolve(os.homedir());
+  if (resolvedTarget === homeDir) {
+    return false;
+  }
+
+  const markers = [".git", ".claude", ".mcp.json", "package.json", "README.md"];
+  return markers.some((entry) => fs.existsSync(path.join(resolvedTarget, entry)));
 }

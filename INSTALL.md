@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.24`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.25`.
 
 ## What This Guide Covers
 
@@ -51,7 +51,7 @@ If you use the local installer from a checkout, the safe default is:
 node ./src/cli.js install-claude .
 ```
 
-That seeds read/search-style ContextForge tools in `.claude/settings.local.json` without silently auto-approving mutation or shell tools. If you explicitly want ContextForge writes, edits, bash, and `dontAsk` mode seeded too:
+That seeds read/search-style ContextForge tools in `.claude/settings.local.json` without silently auto-approving mutation or shell tools. ContextForge also re-checks this safe allowlist when the plugin boots in a project so `dontAsk` mode does not accidentally hard-deny `forge_start` or other read-only tools. If you explicitly want ContextForge writes, edits, bash, and `dontAsk` mode seeded too:
 
 ```bash
 node ./src/cli.js install-claude . --allow-mutations --dont-ask
