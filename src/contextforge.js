@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { openDatabase } from "./storage/db.js";
 import { loadRepositoryFile, loadRepositoryFiles, loadRepositoryInventory, loadRepositoryInventoryEntry } from "./indexing/files.js";
 import { parseSource } from "./indexing/tree-sitter.js";
@@ -63,8 +65,8 @@ export class ContextForge {
     this._filePathById = null;
     this._realRoot = null;
     this._closed = false;
-    this._deferredIndexPromise = null;
     this._deferredIndexState = null;
+    this._deferredIndexChild = null;
     this._watcher = undefined;
     this._watcherSupported = false;
     this._dirtyPaths = new Set();
@@ -551,7 +553,6 @@ export class ContextForge {
 
   scan(query = "") {
     const normalizedQuery = String(query ?? "").trim();
-    this.ensureRepositoryIndexed({ reason: "scan" });
     const overview = this._buildInventoryOverview(normalizedQuery, {
       fallbackQuery: "project structure architecture entrypoints important files"
     });
@@ -610,7 +611,6 @@ export class ContextForge {
 
   walk(query = "") {
     const normalizedQuery = String(query ?? "").trim();
-    this.ensureRepositoryIndexed({ reason: "walk" });
     const exhaustive = this._shouldUseExhaustiveWalk(normalizedQuery);
     const overview = this._buildInventoryOverview(normalizedQuery, {
       fallbackQuery: "project structure architecture packages directories responsibilities important files representative files"
@@ -1812,7 +1812,7 @@ export class ContextForge {
       return false;
     }
 
-    if (this._deferredIndexPromise) {
+    if (this._deferredIndexChild || ["queued", "warming"].includes(this._deferredIndexState?.status)) {
       return true;
     }
 
@@ -1828,50 +1828,13 @@ export class ContextForge {
     const inventory = this._loadRepoInventory();
     const estimatedFileCount = inventory.files.length;
 
-    if (!this._deferredIndexPromise) {
+    if (!this._deferredIndexChild && !["queued", "warming"].includes(this._deferredIndexState?.status)) {
       this._deferredIndexState = {
         status: "queued",
         estimatedFileCount,
         syncReason: reason
       };
-
-      this._deferredIndexPromise = new Promise((resolve) => {
-        setImmediate(() => {
-          if (this._closed) {
-            this._deferredIndexState = {
-              status: "cancelled",
-              estimatedFileCount,
-              syncReason: reason
-            };
-            this._deferredIndexPromise = null;
-            resolve(this._deferredIndexState);
-            return;
-          }
-
-          try {
-            const result = this.ensureRepositoryIndexed({
-              reason,
-              eagerPrime: true
-            });
-            this._deferredIndexState = {
-              status: "ready",
-              estimatedFileCount,
-              ...result
-            };
-            resolve(this._deferredIndexState);
-          } catch (error) {
-            this._deferredIndexState = {
-              status: "error",
-              estimatedFileCount,
-              syncReason: reason,
-              error: error.message
-            };
-            resolve(this._deferredIndexState);
-          } finally {
-            this._deferredIndexPromise = null;
-          }
-        });
-      });
+      this._spawnDeferredStartupPrime(reason, estimatedFileCount);
     }
 
     return {
@@ -1884,6 +1847,54 @@ export class ContextForge {
       estimatedFileCount,
       note: "Large repository detected. ContextForge queued the full eager prime in the background so forge_start can return immediately."
     };
+  }
+
+  _spawnDeferredStartupPrime(reason, estimatedFileCount) {
+    const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+    const child = spawn(process.execPath, [cliPath, "index", this.rootDir], {
+      cwd: this.rootDir,
+      stdio: "ignore",
+      env: {
+        ...process.env,
+        CONTEXTFORGE_USE_ACTIVE_SESSION: "0",
+        CONTEXTFORGE_REMEMBER_SESSION: "0"
+      }
+    });
+
+    this._deferredIndexChild = child;
+    this._deferredIndexState = {
+      status: "warming",
+      estimatedFileCount,
+      syncReason: reason
+    };
+
+    child.unref?.();
+    child.once("exit", (code) => {
+      this._deferredIndexChild = null;
+      if (this._closed) {
+        return;
+      }
+
+      if (code === 0) {
+        const counts = this._repoCounts();
+        this._deferredIndexState = {
+          status: "ready",
+          estimatedFileCount,
+          syncReason: reason,
+          ...counts,
+          repoId: this.repoId,
+          reusedIndex: counts.filesIndexed > 0
+        };
+        return;
+      }
+
+      this._deferredIndexState = {
+        status: "error",
+        estimatedFileCount,
+        syncReason: reason,
+        error: `Background prime exited with code ${code ?? "unknown"}`
+      };
+    });
   }
 
   ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {

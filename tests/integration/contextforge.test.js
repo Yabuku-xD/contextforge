@@ -164,9 +164,37 @@ test("forge_start can defer the eager prime on larger repositories", () => {
 
   try {
     const startup = forge.startup("exhaustive full repository walk - every file, folder, subfolder");
-    assert.equal(startup.index.status, "queued");
+    assert.match(startup.index.status, /queued|warming/);
     assert.equal(startup.index.deferred, true);
     assert.ok(startup.index.estimatedFileCount >= 3);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    if (previousThreshold == null) {
+      delete process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD;
+    } else {
+      process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = previousThreshold;
+    }
+  }
+});
+
+test("forge_walk stays usable immediately after deferred startup", () => {
+  const previousThreshold = process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD;
+  process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = "1";
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-deferred-walk-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "deferred-walk-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
+  fs.writeFileSync(path.join(tempRoot, "README.md"), "# Deferred walk fixture\n");
+  const forge = createContextForge(tempRoot, { sessionId: `deferred_walk_${Date.now()}` });
+
+  try {
+    const startup = forge.startup("exhaustive full repository walk - every file, folder, subfolder");
+    assert.match(startup.index.status, /queued|warming/);
+    const walk = forge.walk("Go through every single file, folder, and subfolder in this project.");
+    assert.equal(walk.mode, "exhaustive_walk");
+    assert.ok(walk.audit.fileCountInspected >= 4);
   } finally {
     forge.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });

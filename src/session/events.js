@@ -10,22 +10,29 @@ export function recordSessionEvent(db, { repoId, sessionId, eventType, payload, 
   }
 
   const event = makeSessionEvent({ repoId, sessionId, eventType, payload: safePayload, confidence });
-  db.prepare(`
-    INSERT OR REPLACE INTO session_events (event_id, repo_id, session_id, event_type, payload_json, confidence, created_at)
-    VALUES (@eventId, @repoId, @sessionId, @eventType, @payloadJson, @confidence, @createdAt)
-  `).run({
-    ...event,
-    payloadJson: JSON.stringify(event.payload)
-  });
+  try {
+    db.prepare(`
+      INSERT OR REPLACE INTO session_events (event_id, repo_id, session_id, event_type, payload_json, confidence, created_at)
+      VALUES (@eventId, @repoId, @sessionId, @eventType, @payloadJson, @confidence, @createdAt)
+    `).run({
+      ...event,
+      payloadJson: JSON.stringify(event.payload)
+    });
 
-  const events = listSessionEvents(db, sessionId, repoId);
-  const edges = buildSessionEdges(events);
-  const insertEdge = db.prepare(`
-    INSERT OR REPLACE INTO session_edges (edge_id, repo_id, from_event_id, to_event_id, edge_type, confidence)
-    VALUES (@edgeId, @repoId, @fromEventId, @toEventId, @edgeType, @confidence)
-  `);
-  for (const edge of edges) {
-    insertEdge.run(edge);
+    const events = listSessionEvents(db, sessionId, repoId);
+    const edges = buildSessionEdges(events);
+    const insertEdge = db.prepare(`
+      INSERT OR REPLACE INTO session_edges (edge_id, repo_id, from_event_id, to_event_id, edge_type, confidence)
+      VALUES (@edgeId, @repoId, @fromEventId, @toEventId, @edgeType, @confidence)
+    `);
+    for (const edge of edges) {
+      insertEdge.run(edge);
+    }
+  } catch (error) {
+    if (isDatabaseLockError(error)) {
+      return null;
+    }
+    throw error;
   }
 
   return event;
@@ -42,4 +49,9 @@ export function listSessionEvents(db, sessionId, repoId) {
     ...row,
     payload: JSON.parse(row.payloadJson)
   }));
+}
+
+function isDatabaseLockError(error) {
+  return error?.errcode === 5 ||
+    (error?.code === "ERR_SQLITE_ERROR" && /database is locked/i.test(String(error?.message ?? "")));
 }

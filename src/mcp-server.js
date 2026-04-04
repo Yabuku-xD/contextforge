@@ -47,12 +47,13 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
       inputSchema: buildToolSchema(tool.parameters)
     }, async (args = {}) => {
       const result = await tool.execute(forge, args);
+      const payload = formatToolResult(tool.name, result);
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(result, null, 2)
+          text: payload.text
         }],
-        structuredContent: normalizeStructuredContent(result)
+        structuredContent: payload.structured
       };
     });
   }
@@ -193,6 +194,152 @@ function normalizeStructuredContent(result) {
   }
 
   return { result };
+}
+
+function formatToolResult(toolName, result) {
+  const normalized = normalizeStructuredContent(result);
+  const compact = compactToolResult(toolName, normalized);
+  return {
+    text: JSON.stringify(compact, null, 2),
+    structured: compact
+  };
+}
+
+function compactToolResult(toolName, result) {
+  if (toolName === "forge_walk" || toolName === "forge_understand") {
+    const mode = result?.mode;
+    if (mode === "exhaustive_walk" || mode === "inventory_walk") {
+      return compactWalkResult(result);
+    }
+  }
+
+  return result;
+}
+
+function compactWalkResult(result) {
+  const topLevel = Array.isArray(result.topLevel)
+    ? result.topLevel.slice(0, 10).map((entry) => ({
+        path: entry.path,
+        fileCount: entry.fileCount,
+        languages: entry.languages
+      }))
+    : result.topLevel;
+  const packages = Array.isArray(result.packages)
+    ? result.packages.slice(0, 10).map((pkg) => ({
+        path: pkg.path,
+        name: pkg.name,
+        description: pkg.description,
+        version: pkg.version
+      }))
+    : result.packages;
+  const rootFiles = Array.isArray(result.rootFiles) ? result.rootFiles.slice(0, 10) : result.rootFiles;
+  const entrypoints = Array.isArray(result.entrypoints)
+    ? result.entrypoints.slice(0, 10).map((entry) => ({
+        path: entry.path,
+        reason: entry.reason,
+        score: entry.score
+      }))
+    : result.entrypoints;
+  const architecture = Array.isArray(result.architecture)
+    ? result.architecture.slice(0, 10).map((entry) => ({
+        label: entry.label,
+        score: entry.score,
+        summary: entry.summary
+      }))
+    : result.architecture;
+  const importantFiles = Array.isArray(result.importantFiles)
+    ? result.importantFiles.slice(0, 10).map((entry) => ({
+        path: entry.path,
+        score: entry.score,
+        reasons: entry.reasons
+      }))
+    : result.importantFiles;
+  const packageSections = sliceWalkSections(result.packageSections, 6);
+  const directorySections = sliceWalkSections(result.directorySections, 6);
+
+  return {
+    ...result,
+    topLevel,
+    packages,
+    rootFiles,
+    entrypoints,
+    architecture,
+    importantFiles,
+    packageSections,
+    directorySections,
+    audit: result.audit
+      ? {
+          ...result.audit,
+          roleBreakdown: Array.isArray(result.audit.roleBreakdown) ? result.audit.roleBreakdown.slice(0, 6) : result.audit.roleBreakdown,
+          binarySamples: Array.isArray(result.audit.binarySamples) ? result.audit.binarySamples.slice(0, 6) : result.audit.binarySamples
+        }
+      : result.audit,
+    responseWindow: {
+      topLevelReturned: Array.isArray(topLevel) ? topLevel.length : 0,
+      packagesReturned: Array.isArray(packages) ? packages.length : 0,
+      packageSectionsReturned: Array.isArray(packageSections) ? packageSections.length : 0,
+      directorySectionsReturned: Array.isArray(directorySections) ? directorySections.length : 0,
+      importantFilesReturned: Array.isArray(importantFiles) ? importantFiles.length : 0,
+      truncatedForMcp: true
+    }
+  };
+}
+
+function sliceWalkSections(sections, limit) {
+  if (!Array.isArray(sections)) {
+    return sections;
+  }
+
+  return sections.slice(0, limit).map((section) => ({
+    path: section.path,
+    name: section.name,
+    description: section.description,
+    purpose: section.purpose,
+    fileCount: section.fileCount,
+    auditedFiles: section.auditedFiles,
+    textFiles: section.textFiles,
+    binaryFiles: section.binaryFiles,
+    languages: section.languages,
+    directFiles: Array.isArray(section.directFiles) ? section.directFiles.slice(0, 4) : section.directFiles,
+    entrypoints: Array.isArray(section.entrypoints)
+      ? section.entrypoints.slice(0, 4).map((entry) => ({
+          path: entry.path,
+          reason: entry.reason,
+          score: entry.score
+        }))
+      : section.entrypoints,
+    subdirectories: Array.isArray(section.subdirectories)
+      ? section.subdirectories.slice(0, 4).map((entry) => ({
+          path: entry.path,
+          fileCount: entry.fileCount,
+          purpose: entry.purpose
+        }))
+      : section.subdirectories,
+    representativeFiles: Array.isArray(section.representativeFiles)
+      ? section.representativeFiles.slice(0, 4).map((entry) => ({
+          path: entry.path,
+          score: entry.score,
+          reasons: entry.reasons
+        }))
+      : section.representativeFiles,
+    notableFiles: Array.isArray(section.notableFiles) ? section.notableFiles.slice(0, 4) : section.notableFiles,
+    workspacePackages: Array.isArray(section.workspacePackages)
+      ? section.workspacePackages.slice(0, 4).map((entry) => ({
+          path: entry.path,
+          name: entry.name,
+          description: entry.description
+        }))
+      : section.workspacePackages,
+    topLevelSamples: Array.isArray(section.topLevelSamples)
+      ? section.topLevelSamples.slice(0, 4).map((entry) => ({
+          path: entry.path,
+          fileCount: entry.fileCount,
+          purpose: entry.purpose
+        }))
+      : section.topLevelSamples,
+    samples: Array.isArray(section.samples) ? section.samples.slice(0, 4) : section.samples,
+    roleBreakdown: Array.isArray(section.roleBreakdown) ? section.roleBreakdown.slice(0, 6) : section.roleBreakdown
+  }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
