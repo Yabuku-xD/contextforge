@@ -11,7 +11,7 @@ export function searchSessionEvents(db, {
   seedHints = []
 }) {
   const normalizedQuery = String(query ?? "").trim();
-  const tokens = unique(tokenize(normalizedQuery)).slice(0, 8);
+  const tokens = extractFtsTerms(normalizedQuery).slice(0, 8);
   const candidates = new Map();
 
   if (tokens.length) {
@@ -145,4 +145,11 @@ function compactSessionPayload(payload) {
   }
 
   return compact;
+}
+
+function extractFtsTerms(query) {
+  return unique(tokenize(query)
+    .flatMap((token) => token.split(/[^a-z0-9_]+/g))
+    .map((token) => token.trim())
+    .filter(Boolean));
 }

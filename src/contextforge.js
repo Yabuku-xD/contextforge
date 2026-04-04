@@ -40,7 +40,7 @@ import { tokenize, unique } from "./utils/text.js";
 import { MODEL_METADATA } from "./storage/model-metadata.js";
 import { purgeOldSessionEvents } from "./session/retention.js";
 import { clearActiveSession } from "./session/runtime.js";
-import { chunkResearchText, searchResearchSections, storeResearchSource } from "./research/store.js";
+import { searchResearchSections, storeResearchSource } from "./research/store.js";
 import { ensureDir, exists, readText, relativeTo, writeText } from "./utils/fs.js";
 import { runShellCommand } from "./utils/process.js";
 
@@ -413,23 +413,36 @@ export class ContextForge {
     const sections = [];
 
     for (const [index, command] of commandList.entries()) {
+      const stdoutCollector = createOutputCollector({
+        previewChars,
+        sectionChars
+      });
+      const stderrCollector = createOutputCollector({
+        previewChars,
+        sectionChars
+      });
       const result = await runShellCommand({
         command,
         cwd: resolvedCwd,
-        timeoutMs
+        timeoutMs,
+        maxCaptureChars: 0,
+        onStdoutChunk: (text) => stdoutCollector.write(text),
+        onStderrChunk: (text) => stderrCollector.write(text)
       });
+      const stdoutResult = stdoutCollector.finish();
+      const stderrResult = stderrCollector.finish();
       commandResults.push({
         command,
         exitCode: result.exitCode,
         timedOut: result.timedOut,
-        stdoutChars: result.stdout.length,
-        stderrChars: result.stderr.length,
-        stdoutPreview: compactCommandOutput(result.stdout, previewChars),
-        stderrPreview: compactCommandOutput(result.stderr, previewChars)
+        stdoutChars: stdoutResult.charCount,
+        stderrChars: stderrResult.charCount,
+        stdoutPreview: stdoutResult.preview,
+        stderrPreview: stderrResult.preview
       });
 
-      const stdoutSections = chunkResearchText(result.stdout, { maxChars: sectionChars });
-      const stderrSections = chunkResearchText(result.stderr, { maxChars: sectionChars });
+      const stdoutSections = stdoutResult.sections;
+      const stderrSections = stderrResult.sections;
 
       if (!stdoutSections.length && !stderrSections.length) {
         sections.push({
@@ -467,6 +480,7 @@ export class ContextForge {
     const queries = queryList.length
       ? searchResearchSections(this.db, {
           repoId: this.repoId,
+          sessionId: this.sessionId,
           queries: queryList,
           sourceId: stored.sourceId,
           limit: 3
@@ -508,6 +522,7 @@ export class ContextForge {
     const sourceId = options.sourceId ? String(options.sourceId) : null;
     const matches = searchResearchSections(this.db, {
       repoId: this.repoId,
+      sessionId: this.sessionId,
       queries: normalizedQueries,
       sourceId,
       limit
@@ -3245,6 +3260,90 @@ function compactCommandOutput(text, maxChars = 4000) {
   const headChars = Math.max(400, Math.floor(maxChars * 0.65));
   const tailChars = Math.max(200, maxChars - headChars - 64);
   return `${normalized.slice(0, headChars)}\n... [output truncated] ...\n${normalized.slice(-tailChars)}`;
+}
+
+function createOutputCollector({ previewChars = 360, sectionChars = 4000 } = {}) {
+  const sections = [];
+  const currentLines = [];
+  let currentLength = 0;
+  let carry = "";
+  let preview = "";
+  let charCount = 0;
+
+  const pushSection = () => {
+    if (!currentLines.length) {
+      return;
+    }
+    sections.push(currentLines.join("\n"));
+    currentLines.length = 0;
+    currentLength = 0;
+  };
+
+  const pushLongLine = (line) => {
+    for (let index = 0; index < line.length; index += sectionChars) {
+      sections.push(line.slice(index, index + sectionChars));
+    }
+  };
+
+  const appendLine = (line) => {
+    if (line.length > sectionChars && !currentLines.length) {
+      pushLongLine(line);
+      return;
+    }
+
+    const candidateLength = currentLength + line.length + 1;
+    if (currentLines.length && candidateLength > sectionChars) {
+      pushSection();
+    }
+
+    if (line.length > sectionChars && !currentLines.length) {
+      pushLongLine(line);
+      return;
+    }
+
+    currentLines.push(line);
+    currentLength += line.length + 1;
+  };
+
+  return {
+    write(chunk) {
+      const text = String(chunk ?? "").replace(/\r\n/g, "\n");
+      if (!text) {
+        return;
+      }
+
+      charCount += text.length;
+      if (preview.length < previewChars) {
+        preview += text.slice(0, previewChars - preview.length);
+      }
+
+      const pieces = text.split("\n");
+      pieces[0] = carry + pieces[0];
+      carry = pieces.pop() ?? "";
+
+      for (const line of pieces) {
+        appendLine(line);
+      }
+    },
+    finish() {
+      if (carry.length) {
+        appendLine(carry);
+        carry = "";
+      }
+      pushSection();
+
+      const normalizedPreview = preview.trim();
+      return {
+        charCount,
+        preview: normalizedPreview
+          ? charCount > normalizedPreview.length
+            ? `${normalizedPreview}\n... [output truncated] ...`
+            : normalizedPreview
+          : "",
+        sections
+      };
+    }
+  };
 }
 
 function buildCommandSummary({ command, cwd, exitCode, timedOut, stdout, stderr }) {

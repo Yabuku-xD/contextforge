@@ -186,6 +186,49 @@ test("ContextForge native file ops handle read write edit directory and bash flo
   }
 });
 
+test("forge_lookup handles code-ish queries and stays scoped to the current session by default", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-research-scope-"));
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "research-fixture", version: "1.0.0" }, null, 2));
+
+  const sourceSessionId = `research_source_${Date.now()}`;
+  const sourceForge = createContextForge(tempRoot, { sessionId: sourceSessionId });
+  let sourceId = null;
+
+  try {
+    const batchResult = await sourceForge.batch([
+      "printf 'alpha-secret\\nfoo:bar\\nsrc/app.js\\n'",
+      "node -e \"process.stdout.write('x'.repeat(12000))\""
+    ], {
+      label: "research-fixture"
+    });
+    sourceId = batchResult.sourceId;
+
+    const sameSessionLookup = sourceForge.lookup(["alpha-secret", "foo:bar", "src/app.js"], {
+      sourceId
+    });
+    assert.equal(sameSessionLookup.queries.length, 3);
+    assert.match(sameSessionLookup.queries[0].matches[0]?.preview ?? "", /alpha-secret/i);
+    assert.match(sameSessionLookup.queries[1].matches[0]?.preview ?? "", /foo:bar/i);
+    assert.match(sameSessionLookup.queries[2].matches[0]?.preview ?? "", /src\/app\.js/i);
+    assert.ok(batchResult.indexedSections >= 4);
+    assert.match(batchResult.commands[1].stdoutPreview, /\[output truncated\]/);
+  } finally {
+    sourceForge.close();
+  }
+
+  const isolatedForge = createContextForge(tempRoot, { sessionId: `research_other_${Date.now()}` });
+  try {
+    const defaultLookup = isolatedForge.lookup(["alpha-secret"]);
+    assert.equal(defaultLookup.queries[0].matches.length, 0);
+
+    const explicitLookup = isolatedForge.lookup(["alpha-secret"], { sourceId });
+    assert.equal(explicitLookup.queries[0].matches.length, 0);
+  } finally {
+    isolatedForge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("ContextForge file ops do not follow symlinks outside the repository", () => {
   const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-symlink-"));
   const outsideRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-outside-"));

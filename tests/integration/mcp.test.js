@@ -111,8 +111,8 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     const batch = await client.callTool({
       name: "forge_batch",
       arguments: {
-        commands: ["printf 'alpha\\nbeta\\n'"],
-        queries: ["beta"]
+        commands: ["printf 'alpha-secret\\nbeta\\n'"],
+        queries: ["alpha-secret"]
       }
     });
     assert.ok(!batch.isError);
@@ -123,12 +123,13 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     const lookup = await client.callTool({
       name: "forge_lookup",
       arguments: {
-        queries: ["beta"],
+        queries: ["alpha-secret"],
         source_id: batchPayload.sourceId
       }
     });
     assert.ok(!lookup.isError);
     assert.match(lookup.content[0].text, /stored research sources|selected source/i);
+    assert.match(lookup.content[0].text, /alpha-secret/i);
   } finally {
     await client.close();
     await transport.close();

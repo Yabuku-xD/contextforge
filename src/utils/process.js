@@ -3,9 +3,15 @@ import { spawn } from "node:child_process";
 export async function runShellCommand({
   command,
   cwd,
-  timeoutMs = 15000
+  timeoutMs = 15000,
+  maxCaptureChars = Number.POSITIVE_INFINITY,
+  onStdoutChunk = null,
+  onStderrChunk = null
 }) {
   const shell = process.env.SHELL || "/bin/sh";
+  const captureLimit = Number.isFinite(maxCaptureChars)
+    ? Math.max(0, maxCaptureChars)
+    : Number.POSITIVE_INFINITY;
 
   return new Promise((resolve) => {
     const child = spawn(shell, ["-lc", command], {
@@ -38,11 +44,23 @@ export async function runShellCommand({
     }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      if (typeof onStdoutChunk === "function") {
+        onStdoutChunk(text);
+      }
+      if (stdout.length < captureLimit) {
+        stdout += text.slice(0, captureLimit - stdout.length);
+      }
     });
 
     child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      if (typeof onStderrChunk === "function") {
+        onStderrChunk(text);
+      }
+      if (stderr.length < captureLimit) {
+        stderr += text.slice(0, captureLimit - stderr.length);
+      }
     });
 
     child.on("error", (error) => {

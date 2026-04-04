@@ -94,6 +94,7 @@ export function storeResearchSource(db, {
 export function searchResearchSections(db, {
   repoId,
   queries,
+  sessionId = null,
   sourceId = null,
   limit = 3
 }) {
@@ -103,14 +104,15 @@ export function searchResearchSections(db, {
     matches: searchOneResearchQuery(db, {
       repoId,
       query,
+      sessionId,
       sourceId,
       limit
     })
   }));
 }
 
-function searchOneResearchQuery(db, { repoId, query, sourceId, limit }) {
-  const tokens = unique(tokenize(query)).slice(0, 8);
+function searchOneResearchQuery(db, { repoId, query, sessionId, sourceId, limit }) {
+  const tokens = extractFtsTerms(query).slice(0, 8);
   if (!tokens.length) {
     return [];
   }
@@ -131,11 +133,12 @@ function searchOneResearchQuery(db, { repoId, query, sourceId, limit }) {
     JOIN research_sources
       ON research_sources.source_id = research_sections.source_id
     WHERE research_sections.repo_id = ?
+      ${sessionId ? "AND (research_sources.session_id = ? OR research_sources.session_id IS NULL)" : ""}
       ${sourceId ? "AND research_sections.source_id = ?" : ""}
       AND research_fts MATCH ?
     ORDER BY rank ASC, research_sections.section_order ASC
     LIMIT ?
-  `).all(...(sourceId ? [repoId, sourceId, matchQuery, limit] : [repoId, matchQuery, limit]));
+  `).all(...buildSearchParams({ repoId, sessionId, sourceId, matchQuery, limit }));
 
   return rows.map((row) => ({
     sourceId: row.sourceId,
@@ -154,4 +157,23 @@ function normalizeQueries(value) {
 
   const single = String(value ?? "").trim();
   return single ? [single] : [];
+}
+
+function buildSearchParams({ repoId, sessionId, sourceId, matchQuery, limit }) {
+  const params = [repoId];
+  if (sessionId) {
+    params.push(sessionId);
+  }
+  if (sourceId) {
+    params.push(sourceId);
+  }
+  params.push(matchQuery, limit);
+  return params;
+}
+
+function extractFtsTerms(query) {
+  return unique(tokenize(query)
+    .flatMap((token) => token.split(/[^a-z0-9_]+/g))
+    .map((token) => token.trim())
+    .filter(Boolean));
 }
