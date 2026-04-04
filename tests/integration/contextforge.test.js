@@ -178,6 +178,39 @@ test("forge_start can defer the eager prime on larger repositories", () => {
   }
 });
 
+test("indexRepository can batch file ingestion into one persistent index", () => {
+  const previousBatchSize = process.env.CONTEXTFORGE_INDEX_BATCH_SIZE;
+  process.env.CONTEXTFORGE_INDEX_BATCH_SIZE = "1";
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-batched-index-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "batched-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "README.md"), "# Batched fixture\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
+
+  const forge = createContextForge(tempRoot, { sessionId: `batched_index_${Date.now()}` });
+  try {
+    const summary = forge.indexRepository();
+    assert.equal(summary.batchSize, 1);
+    assert.ok(summary.batchCount >= 4);
+    assert.equal(summary.indexStatus, "ready");
+    assert.ok(summary.filesIndexed >= 4);
+
+    const reused = forge.indexRepository();
+    assert.equal(reused.reusedIndex, true);
+    assert.equal(reused.indexStatus, "ready");
+    assert.equal(reused.batchSize, 1);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    if (previousBatchSize == null) {
+      delete process.env.CONTEXTFORGE_INDEX_BATCH_SIZE;
+    } else {
+      process.env.CONTEXTFORGE_INDEX_BATCH_SIZE = previousBatchSize;
+    }
+  }
+});
+
 test("forge_walk stays usable immediately after deferred startup", () => {
   const previousThreshold = process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD;
   process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = "1";

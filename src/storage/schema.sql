@@ -4,6 +4,17 @@ CREATE TABLE IF NOT EXISTS repositories (
   repo_id TEXT PRIMARY KEY,
   root_path TEXT NOT NULL,
   default_branch TEXT,
+  content_fingerprint TEXT,
+  quick_repo_stamp TEXT,
+  file_count INTEGER,
+  indexed_file_count INTEGER NOT NULL DEFAULT 0,
+  index_status TEXT NOT NULL DEFAULT 'idle',
+  pending_derived_state INTEGER NOT NULL DEFAULT 0,
+  last_index_error TEXT,
+  batch_size INTEGER,
+  indexed_at INTEGER,
+  last_index_started_at INTEGER,
+  last_index_completed_at INTEGER,
   created_at INTEGER DEFAULT (unixepoch())
 );
 

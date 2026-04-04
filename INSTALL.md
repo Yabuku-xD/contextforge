@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.26`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.27`.
 
 ## What This Guide Covers
 
@@ -74,12 +74,12 @@ After install, Claude can call ContextForge as:
 
 Runtime behavior:
 
-- `forge_start` eagerly reads and indexes the whole repository at session start
+- `forge_start` begins a batched whole-repository warm index at session start and returns progress immediately on larger repos
 - repo-aware tools reuse the live index and only fall back to a full rebuild when the repository watcher cannot reconcile changes cleanly
 - `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
-- project installs also seed `.claude/settings.local.json` with pre-allowed ContextForge MCP tools and `permissions.defaultMode = "dontAsk"` to reduce repeat permission prompts
-  This is now opt-in for mutation and shell tools. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
+- project installs seed `.claude/settings.local.json` with the safe read/search-style ContextForge allowlist so `dontAsk` mode does not hard-deny repo-understanding tools
+  Mutation and shell tools stay opt-in. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
 
 ## 3. Claude Code Chat Commands
 
