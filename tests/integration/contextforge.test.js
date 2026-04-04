@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { DatabaseSync } from "node:sqlite";
 
 import { createContextForge } from "../../src/contextforge.js";
 import { recordSessionEvent } from "../../src/session/events.js";
@@ -271,6 +272,42 @@ test("forge_start can defer the eager prime on larger repositories", () => {
     } else {
       process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = previousThreshold;
     }
+  }
+});
+
+test("forge_start stays usable when the repository database is write-locked", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-startup-lock-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "startup-lock-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
+
+  const forge = createContextForge(tempRoot, { sessionId: `startup_lock_${Date.now()}` });
+  const lockDbPath = path.join(tempRoot, ".contextforge", "contextforge.db");
+  const lockDb = new DatabaseSync(lockDbPath);
+
+  try {
+    forge._writeRepositoryRow({
+      fileCount: 2,
+      indexedFileCount: 0,
+      indexStatus: "warming",
+      pendingDerivedState: 1,
+      batchSize: 1
+    });
+    forge._deferredIndexState = {
+      status: "warming",
+      estimatedFileCount: 2,
+      syncReason: "startup"
+    };
+    lockDb.exec("BEGIN IMMEDIATE");
+    const startup = forge.startup("check index status");
+    assert.ok(startup.index);
+    assert.equal(startup.index.deferred, true);
+    assert.equal(startup.pagePersistence, "deferred_due_to_lock");
+  } finally {
+    lockDb.exec("ROLLBACK");
+    lockDb.close();
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 

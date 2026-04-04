@@ -50,7 +50,7 @@ export function openDatabase(rootDir) {
   return db;
 }
 
-function isDatabaseLockError(error) {
+export function isDatabaseLockError(error) {
   return error?.errcode === 5 ||
     error?.errcode === 261 ||
     (error?.code === "ERR_SQLITE_ERROR" && /database is locked/i.test(String(error?.message ?? "")));

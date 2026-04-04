@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { openDatabase } from "./storage/db.js";
+import { isDatabaseLockError, openDatabase } from "./storage/db.js";
 import { loadRepositoryFile, loadRepositoryInventory, loadRepositoryInventoryEntry } from "./indexing/files.js";
 import { parseSource } from "./indexing/tree-sitter.js";
 import { extractSymbols } from "./indexing/symbols.js";
@@ -338,8 +338,17 @@ export class ContextForge {
       INSERT OR REPLACE INTO pages (page_id, session_id, page_type, source_item_type, source_item_id, size_estimate, pin_state, fault_count, last_used_at, eviction_score)
       VALUES (@pageId, @sessionId, @pageType, @sourceItemType, @sourceItemId, @sizeEstimate, @pinState, @faultCount, @lastUsedAt, @evictionScore)
     `);
-    for (const page of pages) {
-      insertPage.run(page);
+    let pagePersistence = "persisted";
+    try {
+      for (const page of pages) {
+        insertPage.run(page);
+      }
+    } catch (error) {
+      if (isDatabaseLockError(error)) {
+        pagePersistence = "deferred_due_to_lock";
+      } else {
+        throw error;
+      }
     }
 
     recordSessionEvent(this.db, {
@@ -360,6 +369,7 @@ export class ContextForge {
     return {
       index,
       task,
+      pagePersistence,
       layout: cacheLayout({
         coreInstructions: this.startupBrief,
         modules: preloadPlan.preloads
