@@ -111,6 +111,7 @@ export class ContextForge {
         fingerprint: this.repoFingerprint ?? null,
         quickRepoStamp,
         indexStatus: "ready",
+        contentCoverage: this._buildIndexedMemoryCoverage(),
         batchSize,
         batchCount: Math.max(1, Math.ceil(inventory.files.length / batchSize))
       };
@@ -449,6 +450,7 @@ export class ContextForge {
       fallbackQuery: "project structure architecture packages directories responsibilities important files representative files"
     });
     const audit = exhaustive ? this._loadRepoAudit() : null;
+    const indexedMemory = exhaustive ? this._buildIndexedMemoryCoverage() : null;
     const packageSections = this._buildPackageSections({
       files: overview.files,
       packages: overview.packages,
@@ -473,6 +475,7 @@ export class ContextForge {
       rootFiles: overview.rootFiles,
       importantFiles: overview.importantFiles,
       audit,
+      indexedMemory,
       exhaustive
     });
 
@@ -537,16 +540,27 @@ export class ContextForge {
             binaryFileCount: audit.binaryFileCount,
             generatedFileCount: audit.generatedFileCount,
             vendorFileCount: audit.vendorFileCount,
+            totalLineCount: audit.totalLineCount,
+            totalByteCount: audit.totalByteCount,
             readCoverage: {
               openedEveryRepositoryFile: true,
               readFullTextBodies: audit.textFileCount,
               scannedBinaryAssets: audit.binaryFileCount,
+              fullTextLinesRead: audit.totalLineCount,
+              bytesRead: audit.totalByteCount,
               manualPerFileNarrationPending: true,
               canAnswerYesToWholeProjectRead: true
             },
-            answerIfAskedWhetherEveryFileWasRead: "Yes. ContextForge opened every repository file locally for this audit. It read the full body of each text file, scanned binary assets as raw bytes, and returned a compact digest instead of dumping every file body into chat.",
-            answerIfAskedWhetherWholeProjectWasRead: "Yes. ContextForge read the whole project locally for this audit, including every text file body and every binary asset in the repository. The summary is compact, but the underlying audit covered the full repo.",
-            answerIfAskedWhetherEveryCornerWasRead: "Yes. ContextForge covered every file in the repository during this exhaustive walk. It does not keep every line verbatim in chat memory, but it did read the full local file set before producing the digest.",
+            indexedMemory,
+            answerIfAskedWhetherEveryFileWasRead: indexedMemory?.complete
+              ? "Yes. ContextForge opened every repository file locally for this audit and persisted the full text of every text file into its index, with binary assets scanned as raw bytes."
+              : "Yes. ContextForge opened every repository file locally for this audit and read the full body of each text file, but the persistent index may still be warming or deriving before every file body is fully reusable from indexed memory.",
+            answerIfAskedWhetherWholeProjectWasRead: indexedMemory?.complete
+              ? "Yes. ContextForge read the whole project locally for this audit and the indexed memory currently stores the full text of every text file plus binary asset scan coverage for the repository."
+              : "Yes. ContextForge read the whole project locally for this audit, including every text file body and every binary asset in the repository, but the durable indexed-memory layer is still catching up if startup is warming.",
+            answerIfAskedWhetherEveryCornerWasRead: indexedMemory?.complete
+              ? "Yes. ContextForge covered every file in the repository during this exhaustive walk and persisted the complete text-file corpus into indexed memory. The chat summary stays compact, but the indexed repository memory is complete."
+              : "Yes for local read coverage: ContextForge covered every file in the repository during this exhaustive walk. The chat summary stays compact, and the indexed-memory layer may still be finalizing before it can claim full remembered coverage.",
             roleBreakdown: audit.roleBreakdown,
             binarySamples: audit.binarySamples
           }
@@ -841,7 +855,8 @@ export class ContextForge {
       parseFailures,
       dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
       inventoryDirty: watcherAvailable ? this._inventoryDirty : null,
-      embeddingModel: MODEL_METADATA.embeddings.default
+      embeddingModel: MODEL_METADATA.embeddings.default,
+      contentCoverage: this._buildIndexedMemoryCoverage()
     };
   }
 
@@ -859,7 +874,8 @@ export class ContextForge {
       edges: counts.edgesIndexed,
       raptorNodes: counts.raptorNodesIndexed,
       dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
-      inventoryDirty: watcherAvailable ? this._inventoryDirty : null
+      inventoryDirty: watcherAvailable ? this._inventoryDirty : null,
+      contentCoverage: this._buildIndexedMemoryCoverage()
     };
     const session = {
       events: this.db.prepare(`SELECT COUNT(*) AS count FROM session_events WHERE repo_id = ? AND session_id = ?`).get(this.repoId, this.sessionId).count,
@@ -949,7 +965,11 @@ export class ContextForge {
     const columns = [
       "file_id AS fileId",
       "file_path AS relativePath",
-      "language"
+      "language",
+      "content_kind AS contentKind",
+      "content_loaded AS contentLoaded",
+      "byte_count AS byteCount",
+      "line_count AS lineCount"
     ];
 
     if (includeHashes) {
@@ -969,6 +989,15 @@ export class ContextForge {
   }
 
   _materializeFileArtifacts(file) {
+    if (file.contentKind === "binary") {
+      return {
+        parseStatus: "binary",
+        parseError: null,
+        symbols: [],
+        chunks: []
+      };
+    }
+
     let parsed = null;
     let fileArtifacts;
     let parseStatus = "parsed";
@@ -1055,8 +1084,8 @@ export class ContextForge {
 
     const artifacts = this._materializeFileArtifacts(file);
     const insertFile = this.db.prepare(`
-      INSERT OR REPLACE INTO files (file_id, repo_id, file_path, file_hash, content, language, parse_status, parse_error, updated_at)
-      VALUES (@fileId, @repoId, @filePath, @fileHash, @content, @language, @parseStatus, @parseError, @updatedAt)
+      INSERT OR REPLACE INTO files (file_id, repo_id, file_path, file_hash, content, content_kind, content_loaded, byte_count, line_count, language, parse_status, parse_error, updated_at)
+      VALUES (@fileId, @repoId, @filePath, @fileHash, @content, @contentKind, @contentLoaded, @byteCount, @lineCount, @language, @parseStatus, @parseError, @updatedAt)
     `);
     const insertSymbol = this.db.prepare(`
       INSERT OR REPLACE INTO symbols (symbol_id, repo_id, file_id, canonical_name, display_name, kind, language, span_start, span_end, parent_symbol_id, symbol_hash, body)
@@ -1081,6 +1110,10 @@ export class ContextForge {
       filePath: file.relativePath,
       fileHash: file.fileHash,
       content: file.content,
+      contentKind: file.contentKind ?? "text",
+      contentLoaded: file.contentLoaded ? 1 : 0,
+      byteCount: file.byteCount ?? Buffer.byteLength(String(file.content ?? ""), "utf8"),
+      lineCount: file.lineCount ?? normalizeFileLines(String(file.content ?? "")).length,
       language: file.language,
       parseStatus: artifacts.parseStatus,
       parseError: artifacts.parseError,
@@ -1117,6 +1150,7 @@ export class ContextForge {
     ];
     const raptorNodes = buildRaptorTree({ repoId: this.repoId, files, symbols });
     const repoFingerprint = this._computeRepoFingerprint(files);
+    const memoryMetrics = this._buildIndexedMemoryCoverage();
 
     this.db.prepare(`DELETE FROM symbol_edges WHERE repo_id = ?`).run(this.repoId);
     this.db.prepare(`DELETE FROM raptor_nodes WHERE repo_id = ?`).run(this.repoId);
@@ -1147,10 +1181,15 @@ export class ContextForge {
       pendingDerivedState: 0,
       lastIndexError: null,
       batchSize: options.batchSize ?? this._readRepositoryRow()?.batchSize ?? null,
+      indexedTextFileCount: memoryMetrics.textFilesIndexed,
+      indexedBinaryFileCount: memoryMetrics.binaryFilesIndexed,
+      indexedLineCount: memoryMetrics.indexedLineCount,
+      indexedByteCount: memoryMetrics.indexedByteCount,
       indexedAt: completedAt,
       lastIndexStartedAt: options.startedAt ?? this._readRepositoryRow()?.lastIndexStartedAt ?? completedAt,
       lastIndexCompletedAt: completedAt
     });
+    const contentCoverage = this._buildIndexedMemoryCoverage();
 
     return {
       repoFingerprint,
@@ -1158,7 +1197,8 @@ export class ContextForge {
       symbolsIndexed: symbols.length,
       chunksIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count,
       edgesIndexed: pdgEdges.length,
-      raptorNodesIndexed: raptorNodes.length
+      raptorNodesIndexed: raptorNodes.length,
+      contentCoverage
     };
   }
 
@@ -1503,6 +1543,10 @@ export class ContextForge {
         pending_derived_state AS pendingDerivedState,
         last_index_error AS lastIndexError,
         batch_size AS batchSize,
+        indexed_text_file_count AS indexedTextFileCount,
+        indexed_binary_file_count AS indexedBinaryFileCount,
+        indexed_line_count AS indexedLineCount,
+        indexed_byte_count AS indexedByteCount,
         indexed_at AS indexedAt,
         last_index_started_at AS lastIndexStartedAt,
         last_index_completed_at AS lastIndexCompletedAt
@@ -1525,6 +1569,10 @@ export class ContextForge {
       pendingDerivedState: Number(fields.pendingDerivedState ?? current.pendingDerivedState ?? 0),
       lastIndexError: fields.lastIndexError ?? current.lastIndexError ?? null,
       batchSize: fields.batchSize ?? current.batchSize ?? null,
+      indexedTextFileCount: fields.indexedTextFileCount ?? current.indexedTextFileCount ?? 0,
+      indexedBinaryFileCount: fields.indexedBinaryFileCount ?? current.indexedBinaryFileCount ?? 0,
+      indexedLineCount: fields.indexedLineCount ?? current.indexedLineCount ?? 0,
+      indexedByteCount: fields.indexedByteCount ?? current.indexedByteCount ?? 0,
       indexedAt: fields.indexedAt ?? current.indexedAt ?? null,
       lastIndexStartedAt: fields.lastIndexStartedAt ?? current.lastIndexStartedAt ?? null,
       lastIndexCompletedAt: fields.lastIndexCompletedAt ?? current.lastIndexCompletedAt ?? null
@@ -1543,6 +1591,10 @@ export class ContextForge {
         pending_derived_state,
         last_index_error,
         batch_size,
+        indexed_text_file_count,
+        indexed_binary_file_count,
+        indexed_line_count,
+        indexed_byte_count,
         indexed_at,
         last_index_started_at,
         last_index_completed_at
@@ -1559,6 +1611,10 @@ export class ContextForge {
         @pendingDerivedState,
         @lastIndexError,
         @batchSize,
+        @indexedTextFileCount,
+        @indexedBinaryFileCount,
+        @indexedLineCount,
+        @indexedByteCount,
         @indexedAt,
         @lastIndexStartedAt,
         @lastIndexCompletedAt
@@ -1574,6 +1630,10 @@ export class ContextForge {
         pending_derived_state = excluded.pending_derived_state,
         last_index_error = excluded.last_index_error,
         batch_size = excluded.batch_size,
+        indexed_text_file_count = excluded.indexed_text_file_count,
+        indexed_binary_file_count = excluded.indexed_binary_file_count,
+        indexed_line_count = excluded.indexed_line_count,
+        indexed_byte_count = excluded.indexed_byte_count,
         indexed_at = excluded.indexed_at,
         last_index_started_at = excluded.last_index_started_at,
         last_index_completed_at = excluded.last_index_completed_at
@@ -1581,6 +1641,7 @@ export class ContextForge {
   }
 
   _buildIndexProgressSummary(row = this._readRepositoryRow(), counts = this._repoCounts()) {
+    const contentCoverage = this._buildIndexedMemoryCoverage(row);
     return {
       repoId: this.repoId,
       ...counts,
@@ -1592,7 +1653,52 @@ export class ContextForge {
       filesTotal: row?.fileCount ?? counts.filesIndexed,
       pendingDerivedState: Boolean(row?.pendingDerivedState),
       batchSize: row?.batchSize ?? null,
-      lastIndexError: row?.lastIndexError ?? null
+      lastIndexError: row?.lastIndexError ?? null,
+      contentCoverage
+    };
+  }
+
+  _buildIndexedMemoryCoverage(row = this._readRepositoryRow()) {
+    const metrics = this.db.prepare(`
+      SELECT
+        COUNT(*) AS filesIndexed,
+        COALESCE(SUM(CASE WHEN content_kind = 'text' THEN 1 ELSE 0 END), 0) AS textFilesIndexed,
+        COALESCE(SUM(CASE WHEN content_kind = 'binary' THEN 1 ELSE 0 END), 0) AS binaryFilesIndexed,
+        COALESCE(SUM(CASE WHEN content_kind = 'text' AND content_loaded = 1 THEN 1 ELSE 0 END), 0) AS fullTextBodiesStored,
+        COALESCE(SUM(CASE WHEN content_kind = 'binary' AND byte_count > 0 THEN 1 ELSE 0 END), 0) AS binaryAssetsScanned,
+        COALESCE(SUM(line_count), 0) AS indexedLineCount,
+        COALESCE(SUM(byte_count), 0) AS indexedByteCount
+      FROM files
+      WHERE repo_id = ?
+    `).get(this.repoId);
+
+    const filesTotal = row?.fileCount ?? metrics.filesIndexed ?? 0;
+    const indexStatus = row?.indexStatus ?? "idle";
+    const awaitingSync = this._inventoryDirty || this._dirtyPaths.size > 0;
+    const allFilesPersisted = filesTotal > 0 && metrics.filesIndexed === filesTotal;
+    const allTextBodiesPersisted = metrics.textFilesIndexed === metrics.fullTextBodiesStored;
+    const allBinaryAssetsScanned = metrics.binaryFilesIndexed === metrics.binaryAssetsScanned;
+    const complete = indexStatus === "ready" && allFilesPersisted && allTextBodiesPersisted && allBinaryAssetsScanned;
+
+    return {
+      filesTotal,
+      filesIndexed: metrics.filesIndexed,
+      textFilesIndexed: metrics.textFilesIndexed,
+      binaryFilesIndexed: metrics.binaryFilesIndexed,
+      fullTextBodiesStored: metrics.fullTextBodiesStored,
+      binaryAssetsScanned: metrics.binaryAssetsScanned,
+      indexedLineCount: metrics.indexedLineCount,
+      indexedByteCount: metrics.indexedByteCount,
+      allFilesPersisted,
+      allTextBodiesPersisted,
+      allBinaryAssetsScanned,
+      complete,
+      status: complete ? "complete" : indexStatus,
+      awaitingSync,
+      canAnswerYesToRememberingWholeProject: complete && !awaitingSync,
+      reminder: complete
+        ? "ContextForge currently has the full text of every indexed text file stored in its local repository memory."
+        : "ContextForge may have read the repo for an audit, but it should not claim complete remembered coverage until indexed memory reaches ready/complete."
     };
   }
 
@@ -1624,6 +1730,10 @@ export class ContextForge {
         pendingDerivedState: totalFiles ? 1 : 0,
         lastIndexError: null,
         batchSize,
+        indexedTextFileCount: 0,
+        indexedBinaryFileCount: 0,
+        indexedLineCount: 0,
+        indexedByteCount: 0,
         indexedAt: null,
         lastIndexStartedAt: startedAt,
         lastIndexCompletedAt: totalFiles ? null : startedAt
@@ -1654,6 +1764,10 @@ export class ContextForge {
             pendingDerivedState: 1,
             lastIndexError: null,
             batchSize,
+            indexedTextFileCount: this.db.prepare(`SELECT COALESCE(SUM(CASE WHEN content_kind = 'text' THEN 1 ELSE 0 END), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+            indexedBinaryFileCount: this.db.prepare(`SELECT COALESCE(SUM(CASE WHEN content_kind = 'binary' THEN 1 ELSE 0 END), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+            indexedLineCount: this.db.prepare(`SELECT COALESCE(SUM(line_count), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+            indexedByteCount: this.db.prepare(`SELECT COALESCE(SUM(byte_count), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
             indexedAt: null,
             lastIndexStartedAt: startedAt,
             lastIndexCompletedAt: null
@@ -1710,6 +1824,7 @@ export class ContextForge {
         fingerprint: summary.repoFingerprint,
         quickRepoStamp,
         indexStatus: "ready",
+        contentCoverage: summary.contentCoverage,
         batchSize,
         batchCount
       };
@@ -1722,6 +1837,10 @@ export class ContextForge {
         pendingDerivedState: 1,
         lastIndexError: error.message,
         batchSize,
+        indexedTextFileCount: this.db.prepare(`SELECT COALESCE(SUM(CASE WHEN content_kind = 'text' THEN 1 ELSE 0 END), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+        indexedBinaryFileCount: this.db.prepare(`SELECT COALESCE(SUM(CASE WHEN content_kind = 'binary' THEN 1 ELSE 0 END), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+        indexedLineCount: this.db.prepare(`SELECT COALESCE(SUM(line_count), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
+        indexedByteCount: this.db.prepare(`SELECT COALESCE(SUM(byte_count), 0) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
         indexedAt: null,
         lastIndexStartedAt: startedAt,
         lastIndexCompletedAt: null
@@ -2033,13 +2152,14 @@ export class ContextForge {
       }
     }
 
-    return {
-      ...counts,
-      repoId: this.repoId,
-      reusedIndex: true,
-      fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
-      syncReason: reason
-    };
+      return {
+        ...counts,
+        repoId: this.repoId,
+        reusedIndex: true,
+        fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
+        syncReason: reason,
+        contentCoverage: this._buildIndexedMemoryCoverage()
+      };
   }
 
   _loadRepoAudit() {
@@ -2060,6 +2180,8 @@ export class ContextForge {
       binaryFileCount,
       generatedFileCount,
       vendorFileCount,
+      totalLineCount: fileDigests.reduce((sum, file) => sum + (file.lineCount ?? 0), 0),
+      totalByteCount: fileDigests.reduce((sum, file) => sum + (file.bytes ?? 0), 0),
       roleBreakdown: summarizeRoleBreakdown(fileDigests, 8),
       binarySamples: fileDigests
         .filter((file) => !file.isText)
@@ -2099,7 +2221,8 @@ export class ContextForge {
         reusedIndex: true,
         fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
         syncReason: reason,
-        syncMode: "noop"
+        syncMode: "noop",
+        contentCoverage: this._buildIndexedMemoryCoverage()
       };
     }
 
@@ -2155,7 +2278,8 @@ export class ContextForge {
         fingerprint: summary.repoFingerprint,
         syncReason: reason,
         syncMode: "incremental",
-        pathsChanged: normalizedPaths.length
+        pathsChanged: normalizedPaths.length,
+        contentCoverage: summary.contentCoverage
       };
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -2750,7 +2874,7 @@ export class ContextForge {
       .slice(0, limit);
   }
 
-  _buildWalkSummary({ packageInfo, topLevel, packageSections, directorySections, rootFiles, importantFiles, audit = null, exhaustive = false }) {
+  _buildWalkSummary({ packageInfo, topLevel, packageSections, directorySections, rootFiles, importantFiles, audit = null, indexedMemory = null, exhaustive = false }) {
     const manifestText = packageInfo?.name
       ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
       : "no package manifest detected";
@@ -2768,11 +2892,17 @@ export class ContextForge {
     const roleText = audit?.roleBreakdown?.length
       ? `Most common file roles: ${audit.roleBreakdown.slice(0, 4).map((entry) => `${entry.role} (${entry.count})`).join(", ")}.`
       : null;
+    const memoryText = indexedMemory
+      ? indexedMemory.complete
+        ? `Indexed memory is complete: ${indexedMemory.fullTextBodiesStored} text files stored with ${indexedMemory.indexedLineCount} total lines and ${indexedMemory.binaryAssetsScanned} binary assets tracked.`
+        : `Indexed memory status is ${indexedMemory.status}: ${indexedMemory.filesIndexed}/${indexedMemory.filesTotal} files are currently reusable from the persistent repository index.`
+      : null;
 
     return [
       `Package: ${manifestText}.`,
       topLevel.length ? `Top-level layout: ${topLevelText}.` : "Top-level layout: no indexed files.",
       auditText,
+      memoryText,
       packageText,
       directoryText,
       roleText,

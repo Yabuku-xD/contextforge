@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { walkFiles, readText, relativeTo } from "../utils/fs.js";
 import { sha1 } from "../utils/hash.js";
@@ -14,12 +15,18 @@ export function loadRepositoryInventory(rootDir, repoId) {
 
 export function loadRepositoryFile(rootDir, repoId, filePath) {
   const inventory = loadRepositoryInventoryEntry(rootDir, repoId, filePath);
-  const content = readText(inventory.absolutePath);
+  const buffer = fs.readFileSync(inventory.absolutePath);
+  const isBinary = looksBinary(buffer, inventory.relativePath);
+  const content = isBinary ? "" : buffer.toString("utf8");
 
   return {
     ...inventory,
-    fileHash: sha1(content),
-    content
+    fileHash: sha1(isBinary ? buffer.toString("base64") : content),
+    content,
+    contentKind: isBinary ? "binary" : "text",
+    contentLoaded: !isBinary,
+    byteCount: buffer.length,
+    lineCount: isBinary ? 0 : countTextLines(content)
   };
 }
 
@@ -37,4 +44,31 @@ export function loadRepositoryInventoryEntry(rootDir, repoId, filePath) {
     language,
     ...origin
   };
+}
+
+function looksBinary(buffer, filePath = "") {
+  const ext = path.extname(String(filePath ?? "").toLowerCase());
+  if ([
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".pdf", ".zip", ".gz", ".tar",
+    ".tgz", ".mp3", ".mp4", ".mov", ".avi", ".wasm", ".woff", ".woff2", ".ttf", ".otf"
+  ].includes(ext)) {
+    return true;
+  }
+
+  const sample = buffer.subarray(0, Math.min(buffer.length, 2048));
+  for (const byte of sample) {
+    if (byte === 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function countTextLines(content) {
+  if (!content) {
+    return 0;
+  }
+
+  return String(content).split(/\r?\n/).length;
 }

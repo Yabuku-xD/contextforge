@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.27`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.28`.
 
 ## What This Guide Covers
 
@@ -75,6 +75,7 @@ After install, Claude can call ContextForge as:
 Runtime behavior:
 
 - `forge_start` begins a batched whole-repository warm index at session start and returns progress immediately on larger repos
+- the index now tracks explicit text-body and line-coverage proof, so ContextForge can tell the difference between "the repo was read locally for an audit" and "the repo is fully remembered in indexed memory"
 - repo-aware tools reuse the live index and only fall back to a full rebuild when the repository watcher cannot reconcile changes cleanly
 - `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available

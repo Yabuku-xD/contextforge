@@ -27,10 +27,18 @@ export function openDatabase(rootDir) {
   ensureColumn(db, "repositories", "pending_derived_state", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "repositories", "last_index_error", "TEXT");
   ensureColumn(db, "repositories", "batch_size", "INTEGER");
+  ensureColumn(db, "repositories", "indexed_text_file_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "repositories", "indexed_binary_file_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "repositories", "indexed_line_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "repositories", "indexed_byte_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "repositories", "indexed_at", "INTEGER");
   ensureColumn(db, "repositories", "last_index_started_at", "INTEGER");
   ensureColumn(db, "repositories", "last_index_completed_at", "INTEGER");
   ensureColumn(db, "files", "content", "TEXT");
+  ensureColumn(db, "files", "content_kind", "TEXT NOT NULL DEFAULT 'text'");
+  ensureColumn(db, "files", "content_loaded", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "files", "byte_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "files", "line_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "compression_events", "repo_id", "TEXT");
   ensureColumn(db, "compression_events", "session_id", "TEXT");
   return db;

@@ -81,6 +81,11 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(walk.audit.fileCountInspected > 0);
     assert.equal(walk.audit.readCoverage.openedEveryRepositoryFile, true);
     assert.equal(walk.audit.readCoverage.canAnswerYesToWholeProjectRead, true);
+    assert.ok(walk.audit.readCoverage.fullTextLinesRead > 0);
+    assert.ok(walk.audit.indexedMemory.complete);
+    assert.ok(walk.audit.indexedMemory.fullTextBodiesStored > 0);
+    assert.ok(walk.audit.indexedMemory.indexedLineCount > 0);
+    assert.equal(walk.audit.indexedMemory.canAnswerYesToRememberingWholeProject, true);
     assert.ok(walk.audit.answerIfAskedWhetherEveryFileWasRead.includes("Yes."));
     assert.ok(walk.audit.answerIfAskedWhetherWholeProjectWasRead.includes("Yes."));
     assert.ok(walk.audit.answerIfAskedWhetherEveryCornerWasRead.includes("Yes."));
@@ -104,6 +109,7 @@ test("ContextForge native file ops handle read write edit directory and bash flo
   try {
     const startup = forge.startup("prime the repository");
     assert.ok(startup.index.filesIndexed >= 2);
+    assert.ok(startup.index.contentCoverage.complete);
 
     const fileRead = forge.read("src/app.js", { startLine: 1, endLine: 2 });
     assert.equal(fileRead.kind, "file");
@@ -117,12 +123,24 @@ test("ContextForge native file ops handle read write edit directory and bash flo
     assert.equal(writeResult.created, true);
     assert.ok(writeResult.indexSync.filesIndexed >= 3);
     assert.equal(writeResult.indexSync.syncMode, "incremental");
+    assert.ok(writeResult.indexSync.contentCoverage.complete);
 
     const editResult = forge.edit("notes/todo.md", "beta", "gamma");
     assert.equal(editResult.replacements, 1);
     assert.match(editResult.preview, /gamma/);
     assert.ok(editResult.indexSync.filesIndexed >= 3);
     assert.equal(editResult.indexSync.syncMode, "incremental");
+    assert.ok(editResult.indexSync.contentCoverage.complete);
+
+    const indexedNotes = forge.db.prepare(`
+      SELECT content_kind AS contentKind, content_loaded AS contentLoaded, line_count AS lineCount, byte_count AS byteCount
+      FROM files
+      WHERE repo_id = ? AND file_path = ?
+    `).get(forge.repoId, "notes/todo.md");
+    assert.equal(indexedNotes.contentKind, "text");
+    assert.equal(indexedNotes.contentLoaded, 1);
+    assert.equal(indexedNotes.lineCount, 3);
+    assert.ok(indexedNotes.byteCount > 0);
 
     const bashResult = await forge.bash("pwd");
     assert.equal(bashResult.exitCode, 0);
@@ -195,11 +213,14 @@ test("indexRepository can batch file ingestion into one persistent index", () =>
     assert.ok(summary.batchCount >= 4);
     assert.equal(summary.indexStatus, "ready");
     assert.ok(summary.filesIndexed >= 4);
+    assert.ok(summary.contentCoverage.complete);
+    assert.ok(summary.contentCoverage.indexedLineCount > 0);
 
     const reused = forge.indexRepository();
     assert.equal(reused.reusedIndex, true);
     assert.equal(reused.indexStatus, "ready");
     assert.equal(reused.batchSize, 1);
+    assert.ok(reused.contentCoverage.complete);
   } finally {
     forge.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });
