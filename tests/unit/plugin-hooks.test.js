@@ -25,7 +25,7 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_edit/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_bash/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_scope/);
-  assert.match(payload.hookSpecificOutput.additionalContext, /eagerly read\/index the whole repository/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /queue the eager full-repository prime in the background/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /did you read every file/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /did you read the whole project/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /every corner of the files/i);

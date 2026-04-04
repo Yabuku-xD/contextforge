@@ -45,6 +45,7 @@ const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]
 const DEFAULT_FILE_OP_IGNORES = new Set([".git", ".contextforge", "node_modules"]);
 const MAX_INCREMENTAL_SYNC_PATHS = 128;
 const WATCHER_SETTLE_MS = 80;
+const DEFAULT_STARTUP_DEFER_FILE_THRESHOLD = 300;
 
 export class ContextForge {
   constructor(rootDir, options = {}) {
@@ -61,6 +62,9 @@ export class ContextForge {
     this._quickRepoStamp = null;
     this._filePathById = null;
     this._realRoot = null;
+    this._closed = false;
+    this._deferredIndexPromise = null;
+    this._deferredIndexState = null;
     this._watcher = undefined;
     this._watcherSupported = false;
     this._dirtyPaths = new Set();
@@ -68,6 +72,7 @@ export class ContextForge {
   }
 
   close() {
+    this._closed = true;
     this._watcher?.close?.();
     this._watcher = null;
     this.db.close();
@@ -446,11 +451,13 @@ export class ContextForge {
   }
 
   startup(message) {
-    const index = this.ensureRepositoryIndexed({
-      reason: "startup",
-      eagerPrime: true
-    });
     const task = classifyStartup(message);
+    const index = this._shouldDeferStartupPrime(task)
+      ? this._queueDeferredStartupPrime("startup")
+      : this.ensureRepositoryIndexed({
+          reason: "startup",
+          eagerPrime: true
+        });
     const preloadPlan = this._startupPreloadPlan(message, task);
     const pages = [
       createPage({
@@ -499,8 +506,9 @@ export class ContextForge {
         taskLabel: task.label,
         loadStrategy: task.loadStrategy,
         preloadPlan: preloadPlan.name,
-        indexedFiles: index.filesIndexed,
-        reusedIndex: index.reusedIndex
+        indexedFiles: index.filesIndexed ?? 0,
+        reusedIndex: index.reusedIndex ?? false,
+        indexStatus: index.status ?? "ready"
       }
     });
 
@@ -1791,6 +1799,91 @@ export class ContextForge {
     const files = loadRepositoryInventory(this.rootDir, this.repoId);
     this._repoInventory = { files };
     return this._repoInventory;
+  }
+
+  _startupDeferThreshold() {
+    const raw = Number.parseInt(process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD ?? "", 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_STARTUP_DEFER_FILE_THRESHOLD;
+  }
+
+  _shouldDeferStartupPrime(task) {
+    const counts = this._repoCounts();
+    if (counts.filesIndexed > 0 && counts.chunksIndexed > 0) {
+      return false;
+    }
+
+    if (this._deferredIndexPromise) {
+      return true;
+    }
+
+    if (task.label === "trivial" || task.loadStrategy === "minimal") {
+      return false;
+    }
+
+    const inventory = this._loadRepoInventory();
+    return inventory.files.length > this._startupDeferThreshold();
+  }
+
+  _queueDeferredStartupPrime(reason = "startup") {
+    const inventory = this._loadRepoInventory();
+    const estimatedFileCount = inventory.files.length;
+
+    if (!this._deferredIndexPromise) {
+      this._deferredIndexState = {
+        status: "queued",
+        estimatedFileCount,
+        syncReason: reason
+      };
+
+      this._deferredIndexPromise = new Promise((resolve) => {
+        setImmediate(() => {
+          if (this._closed) {
+            this._deferredIndexState = {
+              status: "cancelled",
+              estimatedFileCount,
+              syncReason: reason
+            };
+            this._deferredIndexPromise = null;
+            resolve(this._deferredIndexState);
+            return;
+          }
+
+          try {
+            const result = this.ensureRepositoryIndexed({
+              reason,
+              eagerPrime: true
+            });
+            this._deferredIndexState = {
+              status: "ready",
+              estimatedFileCount,
+              ...result
+            };
+            resolve(this._deferredIndexState);
+          } catch (error) {
+            this._deferredIndexState = {
+              status: "error",
+              estimatedFileCount,
+              syncReason: reason,
+              error: error.message
+            };
+            resolve(this._deferredIndexState);
+          } finally {
+            this._deferredIndexPromise = null;
+          }
+        });
+      });
+    }
+
+    return {
+      repoId: this.repoId,
+      filesIndexed: this._repoCounts().filesIndexed,
+      reusedIndex: false,
+      syncReason: reason,
+      status: this._deferredIndexState?.status ?? "queued",
+      deferred: true,
+      estimatedFileCount,
+      note: "Large repository detected. ContextForge queued the full eager prime in the background so forge_start can return immediately."
+    };
   }
 
   ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {

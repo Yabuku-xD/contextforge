@@ -151,3 +151,29 @@ test("ContextForge file ops do not follow symlinks outside the repository", () =
     fs.rmSync(outsideRoot, { recursive: true, force: true });
   }
 });
+
+test("forge_start can defer the eager prime on larger repositories", () => {
+  const previousThreshold = process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD;
+  process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = "1";
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-deferred-startup-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "deferred-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
+  const forge = createContextForge(tempRoot, { sessionId: `deferred_startup_${Date.now()}` });
+
+  try {
+    const startup = forge.startup("exhaustive full repository walk - every file, folder, subfolder");
+    assert.equal(startup.index.status, "queued");
+    assert.equal(startup.index.deferred, true);
+    assert.ok(startup.index.estimatedFileCount >= 3);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    if (previousThreshold == null) {
+      delete process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD;
+    } else {
+      process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = previousThreshold;
+    }
+  }
+});
