@@ -17,7 +17,7 @@ const SERVER_INFO = {
 const SERVER_INSTRUCTIONS = [
   "ContextForge is a Claude-first code-context server for repository search, architecture lookup, impact analysis, and session continuity.",
   "Use forge_start near the beginning of non-trivial tasks to establish paging and session state. On large repositories, forge_start may queue the eager full-repository prime in the background and return immediately; that is not a failure.",
-  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 300 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents for the initial whole-repo answer unless the user explicitly asks for a manual drilldown. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
+  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 220 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents for the initial whole-repo answer unless the user explicitly asks for a manual drilldown. For shell-heavy research, logs, diffs, test output, or multi-command discovery, prefer forge_batch first and use forge_lookup for follow-up questions so raw output stays in ContextForge's local research index instead of flooding chat. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
 ].join(" ");
 
 export async function startMcpServer(argv = process.argv.slice(2)) {
@@ -163,6 +163,10 @@ function schemaForDescriptor(descriptor) {
       return z.string();
     case "string?":
       return z.string().optional();
+    case "string[]":
+      return z.array(z.string());
+    case "string[]?":
+      return z.array(z.string()).optional();
     case "number":
       return z.number();
     case "number?":
@@ -206,11 +210,15 @@ function formatToolResult(toolName, result) {
 }
 
 function compactToolResult(toolName, result) {
-  if (toolName === "forge_walk" || toolName === "forge_understand") {
+  if (toolName === "forge_scan" || toolName === "forge_understand" || toolName === "forge_walk") {
     const mode = result?.mode;
-    if (mode === "exhaustive_walk" || mode === "inventory_walk") {
+    if (mode === "inventory_first" || mode === "inventory_walk" || mode === "exhaustive_walk") {
       return compactWalkResult(result);
     }
+  }
+
+  if (toolName === "forge_batch" || toolName === "forge_lookup") {
+    return compactResearchResult(result);
   }
 
   return result;
@@ -258,7 +266,7 @@ function compactWalkResult(result) {
       detailsStoredLocally: true,
       expandOnDemand: true,
       truncatedForMcp: true,
-      firstAnswerWordLimit: 300,
+      firstAnswerWordLimit: 220,
       preferredAnswerShape: [
         "coverage_verdict",
         "top_level_architecture",
@@ -273,6 +281,45 @@ function compactWalkResult(result) {
       packageSectionCount: Array.isArray(result.packageSections) ? result.packageSections.length : 0,
       directorySectionCount: Array.isArray(result.directorySections) ? result.directorySections.length : 0,
       importantFileCount: Array.isArray(result.importantFiles) ? result.importantFiles.length : 0
+    }
+  };
+}
+
+function compactResearchResult(result) {
+  return {
+    sourceId: result.sourceId ?? null,
+    label: result.label ?? null,
+    cwd: result.cwd ?? null,
+    summary: result.summary,
+    guidance: result.guidance,
+    commands: Array.isArray(result.commands)
+      ? result.commands.map((command) => ({
+          command: command.command,
+          exitCode: command.exitCode,
+          timedOut: command.timedOut,
+          stdoutChars: command.stdoutChars,
+          stderrChars: command.stderrChars
+        }))
+      : undefined,
+    indexedSections: result.indexedSections ?? null,
+    queries: Array.isArray(result.queries)
+      ? result.queries.map((entry) => ({
+          query: entry.query,
+          matches: Array.isArray(entry.matches)
+            ? entry.matches.slice(0, 3).map((match) => ({
+                title: match.title,
+                label: match.label,
+                preview: match.preview,
+                score: match.score
+              }))
+            : []
+        }))
+      : undefined,
+    responsePolicy: {
+      delivery: "receipt_first",
+      rawOutputStoredLocally: true,
+      expandOnDemand: true,
+      firstAnswerWordLimit: 180
     }
   };
 }

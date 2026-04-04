@@ -21,6 +21,8 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
   try {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "forge_start"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_batch"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_lookup"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_scan"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_understand"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_walk"));
@@ -105,6 +107,28 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     });
     assert.ok(!bash.isError);
     assert.match(bash.content[0].text, /stdoutPreview/i);
+
+    const batch = await client.callTool({
+      name: "forge_batch",
+      arguments: {
+        commands: ["printf 'alpha\\nbeta\\n'"],
+        queries: ["beta"]
+      }
+    });
+    assert.ok(!batch.isError);
+    assert.match(batch.content[0].text, /indexedSections/);
+    assert.match(batch.content[0].text, /receipt_first/);
+
+    const batchPayload = batch.structuredContent;
+    const lookup = await client.callTool({
+      name: "forge_lookup",
+      arguments: {
+        queries: ["beta"],
+        source_id: batchPayload.sourceId
+      }
+    });
+    assert.ok(!lookup.isError);
+    assert.match(lookup.content[0].text, /stored research sources|selected source/i);
   } finally {
     await client.close();
     await transport.close();

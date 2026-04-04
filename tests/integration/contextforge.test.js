@@ -163,6 +163,23 @@ test("ContextForge native file ops handle read write edit directory and bash flo
     const bashResult = await forge.bash("pwd");
     assert.equal(bashResult.exitCode, 0);
     assert.match(bashResult.stdoutPreview, /contextforge-fileops-/);
+
+    const batchResult = await forge.batch([
+      "printf 'alpha\\nbeta\\n'",
+      "printf 'checkout timeout\\n' >&2"
+    ], {
+      queries: ["beta", "checkout timeout"]
+    });
+    assert.ok(batchResult.indexedSections >= 2);
+    assert.equal(batchResult.queries.length, 2);
+    assert.match(batchResult.queries[0].matches[0]?.preview ?? "", /beta/i);
+
+    const lookup = forge.lookup(["checkout timeout"], {
+      sourceId: batchResult.sourceId
+    });
+    assert.equal(lookup.queries.length, 1);
+    assert.match(lookup.queries[0].matches[0]?.preview ?? "", /checkout timeout/i);
+    assert.ok(forge.stats().research.sources >= 1);
   } finally {
     forge.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });

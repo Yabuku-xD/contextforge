@@ -18,6 +18,11 @@ export function recordSessionEvent(db, { repoId, sessionId, eventType, payload, 
       ...event,
       payloadJson: JSON.stringify(event.payload)
     });
+    db.prepare(`DELETE FROM session_event_fts WHERE event_id = ?`).run(event.eventId);
+    db.prepare(`
+      INSERT INTO session_event_fts (event_id, event_type, payload_text)
+      VALUES (?, ?, ?)
+    `).run(event.eventId, event.eventType, JSON.stringify(event.payload));
 
     const events = listSessionEvents(db, sessionId, repoId);
     const edges = buildSessionEdges(events);

@@ -17,6 +17,7 @@ test("open track report includes built-in baselines, external slots, and release
   assert.equal(report.summary.winners.startup.name, "contextforge");
   assert.equal(report.summary.winners.retrieval.name, "contextforge");
   assert.equal(report.summary.winners.endToEnd.name, "contextforge");
+  assert.equal(report.baselines.find((baseline) => baseline.name === "contextforge").summary.session.recallAtK, 1);
   assert.equal(report.releaseGates.overallStatus, "pass");
 });
 

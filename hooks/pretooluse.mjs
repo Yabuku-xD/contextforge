@@ -27,6 +27,20 @@ const BROAD_DISCOVERY_COMMANDS = [
   /\bgit\s+ls-files\b/i
 ];
 
+const OUTPUT_HEAVY_COMMANDS = [
+  /\bgit\s+diff\b/i,
+  /\bgit\s+log\b/i,
+  /\bnpm\s+test\b/i,
+  /\bpnpm\s+test\b/i,
+  /\byarn\s+test\b/i,
+  /\bpytest\b/i,
+  /\bcargo\s+test\b/i,
+  /\bgo\s+test\b/i,
+  /\brg\s+.+/i,
+  /\bgrep\s+-R\b/i,
+  /\bcat\s+.+/i
+];
+
 function safeParseJson(raw) {
   try {
     return JSON.parse(raw);
@@ -63,6 +77,10 @@ function isBroadDiscoveryCommand(command) {
   return matchesAny(command, BROAD_DISCOVERY_COMMANDS);
 }
 
+function isOutputHeavyCommand(command) {
+  return matchesAny(command, OUTPUT_HEAVY_COMMANDS);
+}
+
 function formatContext(additionalContext) {
   return {
     hookSpecificOutput: {
@@ -93,6 +111,18 @@ function createRepoRoutingGuidance(toolName) {
   ].join("\n");
 }
 
+function createResearchRoutingGuidance(toolName) {
+  return [
+    "<contextforge_research>",
+    "ContextForge is the preferred path for shell-heavy research and large command output.",
+    "Use forge_batch to run commands and keep raw output in ContextForge's local research index.",
+    "Use forge_lookup for follow-up questions instead of replaying logs or diffs into chat.",
+    "Keep the first answer short: receipt, key findings, and next step only.",
+    `Current tool: ${toolName}. Use it only if ContextForge is insufficient for the task.`,
+    "</contextforge_research>"
+  ].join("\n");
+}
+
 const rawInput = await new Promise((resolve) => {
   let buffer = "";
   process.stdin.setEncoding("utf8");
@@ -120,12 +150,18 @@ if ((toolName === "Agent" || toolName === "Task") && isWholeRepoRequest(toolText
     response = formatDeny(
       "Broad repository crawling through Bash wastes context. Use ContextForge forge_scan, forge_understand, or forge_walk for repo-wide discovery."
     );
+  } else if (isOutputHeavyCommand(command)) {
+    response = formatDeny(
+      "Large Bash output wastes context. Use ContextForge forge_batch first, then forge_lookup for follow-up questions."
+    );
   } else if (isWholeRepoRequest(command)) {
     response = formatContext(createRepoRoutingGuidance(toolName));
   }
 } else if (toolName === "Read" || toolName === "Grep" || toolName === "WebFetch") {
   if (isWholeRepoRequest(toolText)) {
     response = formatContext(createRepoRoutingGuidance(toolName));
+  } else if (toolName === "Grep" && isOutputHeavyCommand(toolText)) {
+    response = formatContext(createResearchRoutingGuidance(toolName));
   }
 }
 

@@ -1,7 +1,7 @@
 import { clip } from "../utils/text.js";
 import { listSessionEvents } from "./events.js";
 
-const DEFAULT_EXCLUDED_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
+const DEFAULT_EXCLUDED_EVENT_TYPES = new Set(["index", "index_reuse", "startup"]);
 
 export function buildResumeSummary(db, { repoId, sessionId, maxEvents = 10, excludeEventTypes = DEFAULT_EXCLUDED_EVENT_TYPES } = {}) {
   const events = listSessionEvents(db, sessionId, repoId)

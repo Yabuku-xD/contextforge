@@ -23,6 +23,7 @@ import { buildRepoGraph } from "./graph/repo-graph.js";
 import { personalizedPageRank } from "./graph/pagerank.js";
 import { recordSessionEvent, listSessionEvents } from "./session/events.js";
 import { buildResumeSummary } from "./session/resume.js";
+import { searchSessionEvents } from "./session/search.js";
 import { classifyContent } from "./router/classify-content.js";
 import { decideRoute } from "./router/bypass-policy.js";
 import { safeCompress } from "./compression/safe-compress.js";
@@ -39,6 +40,7 @@ import { tokenize, unique } from "./utils/text.js";
 import { MODEL_METADATA } from "./storage/model-metadata.js";
 import { purgeOldSessionEvents } from "./session/retention.js";
 import { clearActiveSession } from "./session/runtime.js";
+import { chunkResearchText, searchResearchSections, storeResearchSource } from "./research/store.js";
 import { ensureDir, exists, readText, relativeTo, writeText } from "./utils/fs.js";
 import { runShellCommand } from "./utils/process.js";
 
@@ -227,11 +229,18 @@ export class ContextForge {
   }
 
   session(query = "") {
-    const lowered = String(query ?? "").toLowerCase();
-    return listSessionEvents(this.db, this.sessionId, this.repoId)
-      .filter((event) => !SYSTEM_EVENT_TYPES.has(event.eventType))
-      .filter((event) =>
-        !lowered || JSON.stringify(event.payload).toLowerCase().includes(lowered) || event.eventType.toLowerCase().includes(lowered));
+    const normalizedQuery = String(query ?? "").trim();
+    if (!normalizedQuery) {
+      return listSessionEvents(this.db, this.sessionId, this.repoId)
+        .filter((event) => !SYSTEM_EVENT_TYPES.has(event.eventType));
+    }
+
+    return searchSessionEvents(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      query: normalizedQuery,
+      limit: 5
+    }).filter((event) => !SYSTEM_EVENT_TYPES.has(event.eventType));
   }
 
   resume() {
@@ -366,6 +375,8 @@ export class ContextForge {
     return [
       "forge_tools",
       "forge_start",
+      "forge_batch",
+      "forge_lookup",
       "forge_scan",
       "forge_understand",
       "forge_walk",
@@ -383,6 +394,141 @@ export class ContextForge {
       "forge_stats",
       "forge_doctor"
     ];
+  }
+
+  async batch(commands, options = {}) {
+    const commandList = normalizeStringArray(commands).slice(0, 8);
+    if (!commandList.length) {
+      throw new Error("forge_batch requires at least one command.");
+    }
+
+    const resolvedCwd = this._resolveWorkspaceCwd(options.cwd);
+    const relativeCwd = relativeTo(this.rootDir, resolvedCwd);
+    const timeoutMs = clampNumber(options.timeoutMs, 250, 120000, 15000);
+    const previewChars = clampNumber(options.maxChars, 120, 2000, 360);
+    const sectionChars = clampNumber(options.sectionChars, 500, 12000, 4000);
+    const label = String(options.label ?? `batch:${commandList[0]}`).trim().slice(0, 120);
+    const queryList = normalizeStringArray(options.queries).slice(0, 8);
+    const commandResults = [];
+    const sections = [];
+
+    for (const [index, command] of commandList.entries()) {
+      const result = await runShellCommand({
+        command,
+        cwd: resolvedCwd,
+        timeoutMs
+      });
+      commandResults.push({
+        command,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        stdoutChars: result.stdout.length,
+        stderrChars: result.stderr.length,
+        stdoutPreview: compactCommandOutput(result.stdout, previewChars),
+        stderrPreview: compactCommandOutput(result.stderr, previewChars)
+      });
+
+      const stdoutSections = chunkResearchText(result.stdout, { maxChars: sectionChars });
+      const stderrSections = chunkResearchText(result.stderr, { maxChars: sectionChars });
+
+      if (!stdoutSections.length && !stderrSections.length) {
+        sections.push({
+          title: `command ${index + 1}: ${command} (no output)`,
+          text: `[no output]\nexitCode=${result.exitCode ?? "null"} timedOut=${result.timedOut ? "yes" : "no"}`
+        });
+      }
+
+      for (const [sectionIndex, text] of stdoutSections.entries()) {
+        sections.push({
+          title: `command ${index + 1}: ${command} stdout ${sectionIndex + 1}`,
+          text
+        });
+      }
+
+      for (const [sectionIndex, text] of stderrSections.entries()) {
+        sections.push({
+          title: `command ${index + 1}: ${command} stderr ${sectionIndex + 1}`,
+          text
+        });
+      }
+    }
+
+    const stored = storeResearchSource(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      label,
+      sourceType: "batch",
+      metadata: {
+        cwd: relativeCwd,
+        commandCount: commandList.length
+      },
+      sections
+    });
+    const queries = queryList.length
+      ? searchResearchSections(this.db, {
+          repoId: this.repoId,
+          queries: queryList,
+          sourceId: stored.sourceId,
+          limit: 3
+        })
+      : [];
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "research_batch",
+      payload: {
+        sourceId: stored.sourceId,
+        label,
+        cwd: relativeCwd,
+        commandCount: commandList.length,
+        queryCount: queryList.length
+      }
+    });
+
+    return {
+      sourceId: stored.sourceId,
+      label,
+      cwd: relativeCwd,
+      commands: commandResults,
+      indexedSections: stored.sectionsIndexed,
+      queries,
+      guidance: "Use forge_lookup for follow-up questions so ContextForge can search the stored command output without replaying raw logs into chat.",
+      summary: `Ran ${commandList.length} command${commandList.length === 1 ? "" : "s"} and indexed ${stored.sectionsIndexed} output section${stored.sectionsIndexed === 1 ? "" : "s"} locally.`
+    };
+  }
+
+  lookup(queries, options = {}) {
+    const normalizedQueries = normalizeStringArray(queries).slice(0, 8);
+    if (!normalizedQueries.length) {
+      throw new Error("forge_lookup requires at least one query.");
+    }
+
+    const limit = clampNumber(options.limit, 1, 10, 3);
+    const sourceId = options.sourceId ? String(options.sourceId) : null;
+    const matches = searchResearchSections(this.db, {
+      repoId: this.repoId,
+      queries: normalizedQueries,
+      sourceId,
+      limit
+    });
+
+    recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      eventType: "research_lookup",
+      payload: {
+        sourceId,
+        queryCount: normalizedQueries.length
+      }
+    });
+
+    return {
+      sourceId,
+      queries: matches,
+      guidance: "Keep the first answer short and cite only the matched section titles or previews. Expand further only if the user asks.",
+      summary: `Searched ${sourceId ? "the selected source" : "stored research sources"} for ${normalizedQueries.length} quer${normalizedQueries.length === 1 ? "y" : "ies"}.`
+    };
   }
 
   scan(query = "") {
@@ -821,6 +967,16 @@ export class ContextForge {
   purge({ maxAgeMs, includePages = true } = {}) {
     purgeOldSessionEvents(this.db, maxAgeMs);
     this.db.prepare(`DELETE FROM compression_events WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
+    const sourceIds = this.db.prepare(`
+      SELECT source_id AS sourceId
+      FROM research_sources
+      WHERE repo_id = ? AND session_id = ?
+    `).all(this.repoId, this.sessionId);
+    for (const source of sourceIds) {
+      this.db.prepare(`DELETE FROM research_fts WHERE section_id IN (SELECT section_id FROM research_sections WHERE source_id = ?)`).run(source.sourceId);
+      this.db.prepare(`DELETE FROM research_sections WHERE source_id = ?`).run(source.sourceId);
+    }
+    this.db.prepare(`DELETE FROM research_sources WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
     if (includePages) {
       this.db.prepare(`DELETE FROM pages WHERE session_id = ?`).run(this.sessionId);
     }
@@ -841,6 +997,8 @@ export class ContextForge {
     const parseFailures = indexed
       ? this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ? AND parse_status = 'error'`).get(this.repoId).count
       : 0;
+    const researchSourceCount = this.db.prepare(`SELECT COUNT(*) AS count FROM research_sources WHERE repo_id = ?`).get(this.repoId).count;
+    const researchSectionCount = this.db.prepare(`SELECT COUNT(*) AS count FROM research_sections WHERE repo_id = ?`).get(this.repoId).count;
     return {
       rootDir: this.rootDir,
       repoId: this.repoId,
@@ -853,6 +1011,8 @@ export class ContextForge {
       raptorNodeCount: counts.raptorNodesIndexed,
       pageCount,
       parseFailures,
+      researchSourceCount,
+      researchSectionCount,
       dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
       inventoryDirty: watcherAvailable ? this._inventoryDirty : null,
       embeddingModel: MODEL_METADATA.embeddings.default,
@@ -881,7 +1041,16 @@ export class ContextForge {
       events: this.db.prepare(`SELECT COUNT(*) AS count FROM session_events WHERE repo_id = ? AND session_id = ?`).get(this.repoId, this.sessionId).count,
       edges: this.db.prepare(`SELECT COUNT(*) AS count FROM session_edges WHERE repo_id = ?`).get(this.repoId).count
     };
-    return { compression, retrieval, session, pager: this.pageState() };
+    const research = {
+      sources: this.db.prepare(`SELECT COUNT(*) AS count FROM research_sources WHERE repo_id = ? AND session_id = ?`).get(this.repoId, this.sessionId).count,
+      sections: this.db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM research_sections
+        WHERE repo_id = ?
+          AND source_id IN (SELECT source_id FROM research_sources WHERE repo_id = ? AND session_id = ?)
+      `).get(this.repoId, this.repoId, this.sessionId).count
+    };
+    return { compression, retrieval, session, research, pager: this.pageState() };
   }
 
   _clearRepoData() {
@@ -1313,13 +1482,6 @@ export class ContextForge {
   }
 
   _rankSessionEvidence(query, seeds) {
-    const events = listSessionEvents(this.db, this.sessionId, this.repoId)
-      .filter((event) => !SYSTEM_EVENT_TYPES.has(event.eventType));
-    if (!events.length) {
-      return [];
-    }
-
-    const queryTokens = tokenize(query);
     const seedHints = unique(seeds.flatMap((seed) => {
       const label = String(seed.label ?? "").toLowerCase();
       return [
@@ -1335,53 +1497,15 @@ export class ContextForge {
       .map((seed) => seed.label?.split("::").pop())
       .filter(Boolean));
 
-    return events
-      .map((event) => {
-        const payload = event.payload ?? {};
-        const payloadText = JSON.stringify(payload);
-        const haystack = `${event.eventType} ${payloadText}`.toLowerCase();
-        const eventTokens = new Set(tokenize(haystack));
-        let score = 0;
-
-        for (const token of queryTokens) {
-          if ([...eventTokens].some((candidate) => candidate.includes(token) || token.includes(candidate))) {
-            score += 1;
-          }
-        }
-
-        for (const hint of seedHints) {
-          if (haystack.includes(hint)) {
-            score += 2;
-          }
-        }
-
-        if (payload.filePath && seedFiles.includes(payload.filePath)) {
-          score += 4;
-        }
-
-        if (payload.symbolId && seedSymbols.some((symbol) => payload.symbolId.toLowerCase().includes(String(symbol).toLowerCase()))) {
-          score += 4;
-        }
-
-        if (event.eventType === "failure") {
-          score += 1.5;
-        }
-
-        if (event.eventType === "edit" && payload.filePath && seedFiles.includes(payload.filePath)) {
-          score += 1.5;
-        }
-
-        return {
-          eventId: event.eventId,
-          eventType: event.eventType,
-          createdAt: event.createdAt,
-          payload: this._compactSessionPayload(payload),
-          score: Number(score.toFixed(3))
-        };
-      })
-      .filter((event) => event.score > 0)
-      .sort((left, right) => right.score - left.score || right.createdAt - left.createdAt)
-      .slice(0, 5);
+    return searchSessionEvents(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      query,
+      limit: 5,
+      seedFiles,
+      seedSymbols,
+      seedHints
+    }).filter((event) => !SYSTEM_EVENT_TYPES.has(event.eventType));
   }
 
   _pageContext() {
@@ -3097,6 +3221,15 @@ function buildExcerptAroundIndex(content, index, { contextLines = 2, maxLines = 
   const startLine = Math.max(1, targetLine - contextLines);
   const endLine = Math.min(lines.length, startLine + maxLines - 1);
   return formatNumberedLines(lines.slice(startLine - 1, endLine), startLine, endLine);
+}
+
+function normalizeStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
+  }
+
+  const single = String(value ?? "").trim();
+  return single ? [single] : [];
 }
 
 function compactCommandOutput(text, maxChars = 4000) {

@@ -126,6 +126,21 @@ async function main(argv) {
       case "search":
         console.log(JSON.stringify(forge.search(query), null, 2));
         break;
+      case "batch":
+        console.log(JSON.stringify(await forge.batch(parseJsonArray(query), {
+          queries: parseJsonArray(rest[2]),
+          cwd: rest[3],
+          label: rest[4],
+          timeoutMs: rest[5],
+          maxChars: rest[6]
+        }), null, 2));
+        break;
+      case "lookup":
+        console.log(JSON.stringify(forge.lookup(parseJsonArray(query), {
+          sourceId: rest[2],
+          limit: rest[3]
+        }), null, 2));
+        break;
       case "symbol":
         console.log(JSON.stringify(forge.symbol(query), null, 2));
         break;
@@ -208,6 +223,19 @@ async function main(argv) {
     }
   } finally {
     forge.close();
+  }
+}
+
+function parseJsonArray(value) {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [String(value)];
+  } catch {
+    return [String(value)];
   }
 }
 

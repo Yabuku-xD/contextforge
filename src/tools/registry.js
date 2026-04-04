@@ -1,5 +1,7 @@
 import { forgeGetTool } from "./forge_get_tool.js";
 import { forgeStartupTool } from "./forge_startup.js";
+import { forgeBatchTool } from "./forge_batch.js";
+import { forgeLookupTool } from "./forge_lookup.js";
 import { forgeScanTool } from "./forge_scan.js";
 import { forgeUnderstandTool } from "./forge_understand.js";
 import { forgeWalkTool } from "./forge_walk.js";
@@ -20,6 +22,8 @@ import { forgeDoctorTool } from "./forge_doctor.js";
 export const TOOL_REGISTRY = {
   forge_get_tool: forgeGetTool,
   forge_startup: forgeStartupTool,
+  forge_batch: forgeBatchTool,
+  forge_lookup: forgeLookupTool,
   forge_scan: forgeScanTool,
   forge_understand: forgeUnderstandTool,
   forge_walk: forgeWalkTool,

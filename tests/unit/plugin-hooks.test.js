@@ -33,6 +33,8 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
 
   assert.equal(payload.hookSpecificOutput.hookEventName, "SessionStart");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_start/);
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_batch/);
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_lookup/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_scan/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_understand/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_walk/);
@@ -89,4 +91,25 @@ test("pretooluse nudges broad repo discovery back toward ContextForge", () => {
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /ContextForge/i);
+});
+
+test("pretooluse routes output-heavy bash toward forge_batch", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["hooks/pretooluse.mjs"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {
+          command: "git diff --stat HEAD~3..HEAD"
+        }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
+  assert.match(payload.hookSpecificOutput.permissionDecisionReason, /forge_batch/i);
 });

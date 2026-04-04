@@ -9,8 +9,14 @@ export function openDatabase(rootDir) {
   const schemaPath = new URL("./schema.sql", import.meta.url);
 
   const db = new DatabaseSync(dbPath);
-  db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA busy_timeout = 5000");
+  try {
+    db.exec("PRAGMA journal_mode = WAL");
+  } catch (error) {
+    if (!isDatabaseLockError(error)) {
+      throw error;
+    }
+  }
   const prepare = db.prepare.bind(db);
   db.prepare = (sql) => {
     const statement = prepare(sql);
@@ -42,6 +48,12 @@ export function openDatabase(rootDir) {
   ensureColumn(db, "compression_events", "repo_id", "TEXT");
   ensureColumn(db, "compression_events", "session_id", "TEXT");
   return db;
+}
+
+function isDatabaseLockError(error) {
+  return error?.errcode === 5 ||
+    error?.errcode === 261 ||
+    (error?.code === "ERR_SQLITE_ERROR" && /database is locked/i.test(String(error?.message ?? "")));
 }
 
 function ensureColumn(db, tableName, columnName, definition) {

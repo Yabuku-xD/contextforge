@@ -150,3 +150,35 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
   label,
   text
 );
+
+CREATE TABLE IF NOT EXISTS research_sources (
+  source_id TEXT PRIMARY KEY,
+  repo_id TEXT NOT NULL,
+  session_id TEXT,
+  source_type TEXT NOT NULL,
+  label TEXT NOT NULL,
+  metadata_json TEXT NOT NULL,
+  created_at INTEGER DEFAULT (unixepoch())
+);
+
+CREATE TABLE IF NOT EXISTS research_sections (
+  section_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL,
+  repo_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  text TEXT NOT NULL,
+  section_order INTEGER NOT NULL DEFAULT 0,
+  token_estimate INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS research_fts USING fts5(
+  section_id UNINDEXED,
+  title,
+  text
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS session_event_fts USING fts5(
+  event_id UNINDEXED,
+  event_type,
+  payload_text
+);

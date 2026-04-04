@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.29`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.30`.
 
 ## What This Guide Covers
 
@@ -80,6 +80,8 @@ Runtime behavior:
 - repo-aware tools reuse the live index and only fall back to a full rebuild when the repository watcher cannot reconcile changes cleanly
 - `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
+- `forge_batch` can run multi-command shell research, store the full output locally in ContextForge's indexed research store, and return only a compact receipt plus query hits
+- `forge_lookup` can search stored research outputs later without replaying raw logs, test output, diffs, or command output into chat
 - broad repo-crawl attempts through built-in `Agent`, `Task`, `Bash`, `Read`, or `Grep` are now steered back toward compact ContextForge discovery flows first
 - project installs seed `.claude/settings.local.json` with the safe read/search-style ContextForge allowlist so `dontAsk` mode does not hard-deny repo-understanding tools
   Mutation and shell tools stay opt-in. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
@@ -107,6 +109,8 @@ Recommended command map:
 
 - `/contextforge:forge-understand` for fast repo orientation
 - `/contextforge:forge-walk` for deeper package-by-package or folder-by-folder walkthroughs
+- `forge_batch` for shell-heavy research and large command output you do not want dumped into chat
+- `forge_lookup` for follow-up questions against stored research output
 - `/contextforge:forge-read` for compact file excerpts or directory listings
 - `/contextforge:forge-write` for file creation or overwrite
 - `/contextforge:forge-edit` for exact replacements with small previews
