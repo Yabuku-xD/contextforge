@@ -60,7 +60,10 @@ async function main(argv) {
 
   if (command === "install-claude") {
     const targetDir = path.resolve(rest[0] ?? process.cwd());
-    console.log(JSON.stringify(installClaudeCodeProject(targetDir), null, 2));
+    console.log(JSON.stringify(installClaudeCodeProject(targetDir, {
+      allowMutations: flags.allowMutations,
+      dontAsk: flags.dontAsk
+    }), null, 2));
     return;
   }
 
@@ -213,7 +216,9 @@ function parseCliArgs(args) {
   const flags = {
     sessionId: null,
     useActiveSession: false,
-    rememberSession: false
+    rememberSession: false,
+    allowMutations: false,
+    dontAsk: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -236,6 +241,16 @@ function parseCliArgs(args) {
 
     if (value === "--remember-session") {
       flags.rememberSession = true;
+      continue;
+    }
+
+    if (value === "--allow-mutations") {
+      flags.allowMutations = true;
+      continue;
+    }
+
+    if (value === "--dont-ask") {
+      flags.dontAsk = true;
       continue;
     }
 

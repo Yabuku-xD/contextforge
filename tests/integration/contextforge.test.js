@@ -132,3 +132,22 @@ test("ContextForge native file ops handle read write edit directory and bash flo
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test("ContextForge file ops do not follow symlinks outside the repository", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-symlink-"));
+  const outsideRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-outside-"));
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "symlink-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(outsideRoot, "secret.txt"), "top-secret\n");
+  fs.symlinkSync(outsideRoot, path.join(tempRoot, "link-out"));
+
+  const forge = createContextForge(tempRoot, { sessionId: `symlink_${Date.now()}` });
+  try {
+    assert.throws(() => forge.read("link-out/secret.txt"), /resolving symlinks/i);
+    assert.throws(() => forge.write("link-out/secret.txt", "after"), /resolving symlinks/i);
+    assert.throws(() => forge.edit("link-out/secret.txt", "top", "after"), /resolving symlinks/i);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});

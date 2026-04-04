@@ -36,7 +36,8 @@ test("installClaudeCodeProject creates or merges a Claude Code mcp config", () =
   fs.writeFileSync(settingsPath, JSON.stringify({
     permissions: {
       allow: [
-        "mcp__plugin_contextforge_contextforge__forge_start"
+        "mcp__plugin_contextforge_contextforge__forge_start",
+        "mcp__plugin_contextforge_contextforge__forge_bash"
       ]
     }
   }, null, 2));
@@ -53,10 +54,29 @@ test("installClaudeCodeProject creates or merges a Claude Code mcp config", () =
   assert.equal(config.mcpServers.contextforge.args[2], ".");
   assert.equal(config.mcpServers.contextforge.env.CONTEXTFORGE_USE_ACTIVE_SESSION, "1");
   assert.equal(result.permissionsPath, settingsPath);
-  assert.ok(result.allowedTools >= 36);
-  assert.equal(settings.permissions.defaultMode, "dontAsk");
+  assert.ok(result.allowedTools >= 30);
+  assert.equal(settings.permissions.defaultMode, undefined);
   assert.ok(settings.permissions.allow.includes("mcp__contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
+});
+
+test("installClaudeCodeProject can opt into mutation approvals and dontAsk mode", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-unsafe-"));
+  const result = installClaudeCodeProject(tempDir, {
+    allowMutations: true,
+    dontAsk: true
+  });
+  const settingsPath = path.join(tempDir, ".claude", "settings.local.json");
+  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+
+  assert.equal(result.mutatingToolsAllowed, true);
+  assert.equal(result.defaultMode, "dontAsk");
+  assert.equal(settings.permissions.defaultMode, "dontAsk");
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
 });

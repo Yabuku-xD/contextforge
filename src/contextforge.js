@@ -60,6 +60,7 @@ export class ContextForge {
     this._repoAudit = null;
     this._quickRepoStamp = null;
     this._filePathById = null;
+    this._realRoot = null;
     this._watcher = undefined;
     this._watcherSupported = false;
     this._dirtyPaths = new Set();
@@ -1979,6 +1980,10 @@ export class ContextForge {
       throw new Error("Path must stay inside the current repository.");
     }
 
+    this._assertPathInsideRepo(resolved, {
+      allowMissing: options.allowMissing
+    });
+
     if (!options.allowMissing && !exists(resolved)) {
       throw new Error(`Path not found: ${input}`);
     }
@@ -1988,6 +1993,40 @@ export class ContextForge {
     }
 
     return resolved;
+  }
+
+  _repoRealRoot() {
+    if (!this._realRoot) {
+      this._realRoot = fs.realpathSync(this.rootDir);
+    }
+
+    return this._realRoot;
+  }
+
+  _assertPathInsideRepo(candidatePath, { allowMissing = false } = {}) {
+    const rootReal = this._repoRealRoot();
+    const candidateReal = allowMissing
+      ? this._resolveRealTargetForMissingPath(candidatePath)
+      : fs.realpathSync(candidatePath);
+
+    const relativeReal = path.relative(rootReal, candidateReal);
+    if (relativeReal.startsWith("..") || path.isAbsolute(relativeReal)) {
+      throw new Error("Path must stay inside the current repository after resolving symlinks.");
+    }
+  }
+
+  _resolveRealTargetForMissingPath(candidatePath) {
+    let probe = candidatePath;
+    while (!exists(probe)) {
+      const parent = path.dirname(probe);
+      if (parent === probe) {
+        throw new Error("Unable to resolve a safe path inside the current repository.");
+      }
+      probe = parent;
+    }
+
+    const realAncestor = fs.realpathSync(probe);
+    return path.resolve(realAncestor, path.relative(probe, candidatePath));
   }
 
   _resolveWorkspaceCwd(cwd) {

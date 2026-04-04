@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.22`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.23`.
 
 ## What This Guide Covers
 
@@ -45,6 +45,18 @@ Scope guide:
 
 This marketplace installs directly from GitHub. No separate npm publish step is required for the plugin path.
 
+If you use the local installer from a checkout, the safe default is:
+
+```bash
+node ./src/cli.js install-claude .
+```
+
+That seeds read/search-style ContextForge tools in `.claude/settings.local.json` without silently auto-approving mutation or shell tools. If you explicitly want ContextForge writes, edits, bash, and `dontAsk` mode seeded too:
+
+```bash
+node ./src/cli.js install-claude . --allow-mutations --dont-ask
+```
+
 ## 2. What Gets Installed
 
 The plugin includes:
@@ -67,6 +79,7 @@ Runtime behavior:
 - `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
 - project installs also seed `.claude/settings.local.json` with pre-allowed ContextForge MCP tools and `permissions.defaultMode = "dontAsk"` to reduce repeat permission prompts
+  This is now opt-in for mutation and shell tools. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
 
 ## 3. Claude Code Chat Commands
 
