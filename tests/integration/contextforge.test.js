@@ -79,7 +79,10 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(walk.directorySections.length > 0);
     assert.ok(walk.audit.fileCountInspected > 0);
     assert.equal(walk.audit.readCoverage.openedEveryRepositoryFile, true);
+    assert.equal(walk.audit.readCoverage.canAnswerYesToWholeProjectRead, true);
     assert.ok(walk.audit.answerIfAskedWhetherEveryFileWasRead.includes("Yes."));
+    assert.ok(walk.audit.answerIfAskedWhetherWholeProjectWasRead.includes("Yes."));
+    assert.ok(walk.audit.answerIfAskedWhetherEveryCornerWasRead.includes("Yes."));
     assert.match(walk.guidance, /exhaustive repository digest/i);
     assert.match(walk.summary, /opened all .* repository files locally/i);
 
