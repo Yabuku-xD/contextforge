@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.20`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.21`.
 
 ## What This Guide Covers
 
@@ -59,6 +59,12 @@ After install, Claude can call ContextForge as:
 - an MCP server
 - a set of chat commands
 - a native repository execution layer for compact reads, writes, edits, and bash commands
+
+Runtime behavior:
+
+- `forge_start` eagerly reads and indexes the whole repository at session start
+- repo-aware tools refresh the index automatically when repository files change
+- `forge_write`, `forge_edit`, and repo-changing `forge_bash` flows sync the index after mutations
 
 ## 3. Claude Code Chat Commands
 

@@ -121,23 +121,18 @@ async function main(argv) {
         console.log(JSON.stringify(forge.indexRepository(), null, 2));
         break;
       case "search":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.search(query), null, 2));
         break;
       case "symbol":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.symbol(query), null, 2));
         break;
       case "scope":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.scope(query, rest[2] ?? "auto"), null, 2));
         break;
       case "impact":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.impact(query), null, 2));
         break;
       case "why":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.why(query), null, 2));
         break;
       case "resume":
@@ -147,11 +142,9 @@ async function main(argv) {
         console.log(JSON.stringify(forge.startup(query), null, 2));
         break;
       case "understand":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.understand(query), null, 2));
         break;
       case "walk":
-        forge.indexRepository();
         console.log(JSON.stringify(forge.walk(query), null, 2));
         break;
       case "read":

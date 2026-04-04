@@ -56,6 +56,7 @@ export class ContextForge {
     this._repoState = null;
     this._repoInventory = null;
     this._repoAudit = null;
+    this._quickRepoStamp = null;
     this._filePathById = null;
   }
 
@@ -68,11 +69,13 @@ export class ContextForge {
     const repoId = this.repoId;
     const files = loadRepositoryFiles(this.rootDir, repoId);
     const repoFingerprint = this._computeRepoFingerprint(files);
+    const quickRepoStamp = this._computeQuickRepoStamp(files);
     this.repoFingerprint = repoFingerprint;
 
     if (!options.force && this._canReuseIndex(repoFingerprint, files.length)) {
       this._repoState = null;
       this._filePathById = null;
+      this._quickRepoStamp = quickRepoStamp;
       recordSessionEvent(db, {
         repoId,
         sessionId: this.sessionId,
@@ -247,6 +250,8 @@ export class ContextForge {
 
       db.exec("COMMIT");
       this._invalidateRepoCaches();
+      this.repoFingerprint = repoFingerprint;
+      this._quickRepoStamp = quickRepoStamp;
       return {
         repoId,
         filesIndexed: files.length,
@@ -264,6 +269,7 @@ export class ContextForge {
   }
 
   search(query, options = {}) {
+    this.ensureRepositoryIndexed({ reason: "search" });
     const state = this._loadRepoState();
     const results = hybridSearch({
       db: this.db,
@@ -292,6 +298,7 @@ export class ContextForge {
   }
 
   symbol(query, options = {}) {
+    this.ensureRepositoryIndexed({ reason: "symbol" });
     const symbols = this._loadSymbols();
     const exact = exactSymbolSearch(query, symbols, options.limit ?? 10);
     if (exact.length) {
@@ -303,6 +310,7 @@ export class ContextForge {
   }
 
   scope(query, mode = "auto") {
+    this.ensureRepositoryIndexed({ reason: "scope" });
     const state = this._loadRepoState();
     const resolvedMode = mode === "auto" ? this.planRaptor(query).strategy : mode;
     if (resolvedMode === "traversal") {
@@ -335,6 +343,7 @@ export class ContextForge {
   }
 
   impact(query) {
+    this.ensureRepositoryIndexed({ reason: "impact" });
     const symbols = this._loadSymbols();
     const seed = exactSymbolSearch(query, symbols, 1)[0];
     if (!seed) {
@@ -348,6 +357,7 @@ export class ContextForge {
 
   why(query) {
     const normalizedQuery = String(query ?? "").trim();
+    this.ensureRepositoryIndexed({ reason: "why" });
     const state = this._loadRepoState();
     const seeds = this._buildWhySeeds(state, normalizedQuery).slice(0, 3);
     const graphRanking = this._rankWhyGraph(state.repoGraph, seeds).slice(0, 6);
@@ -422,6 +432,10 @@ export class ContextForge {
   }
 
   startup(message) {
+    const index = this.ensureRepositoryIndexed({
+      reason: "startup",
+      eagerPrime: true
+    });
     const task = classifyStartup(message);
     const preloadPlan = this._startupPreloadPlan(message, task);
     const pages = [
@@ -470,11 +484,14 @@ export class ContextForge {
         message,
         taskLabel: task.label,
         loadStrategy: task.loadStrategy,
-        preloadPlan: preloadPlan.name
+        preloadPlan: preloadPlan.name,
+        indexedFiles: index.filesIndexed,
+        reusedIndex: index.reusedIndex
       }
     });
 
     return {
+      index,
       task,
       layout: cacheLayout({
         coreInstructions: this.startupBrief,
@@ -512,6 +529,7 @@ export class ContextForge {
 
   scan(query = "") {
     const normalizedQuery = String(query ?? "").trim();
+    this.ensureRepositoryIndexed({ reason: "scan" });
     const overview = this._buildInventoryOverview(normalizedQuery, {
       fallbackQuery: "project structure architecture entrypoints important files"
     });
@@ -570,6 +588,7 @@ export class ContextForge {
 
   walk(query = "") {
     const normalizedQuery = String(query ?? "").trim();
+    this.ensureRepositoryIndexed({ reason: "walk" });
     const exhaustive = this._shouldUseExhaustiveWalk(normalizedQuery);
     const overview = this._buildInventoryOverview(normalizedQuery, {
       fallbackQuery: "project structure architecture packages directories responsibilities important files representative files"
@@ -751,6 +770,10 @@ export class ContextForge {
 
     writeText(resolved, String(content ?? ""));
     this._invalidateRepoCaches();
+    const indexSync = this.ensureRepositoryIndexed({
+      reason: "write",
+      force: true
+    });
 
     recordSessionEvent(this.db, {
       repoId: this.repoId,
@@ -768,6 +791,7 @@ export class ContextForge {
       created: !existed,
       bytesWritten: Buffer.byteLength(String(content ?? ""), "utf8"),
       linesWritten: normalizeFileLines(String(content ?? "")).length,
+      indexSync,
       summary: `${existed ? "Updated" : "Created"} ${relativePath}.`
     };
   }
@@ -795,6 +819,10 @@ export class ContextForge {
       : beforeNormalized.replace(source, replacement);
     writeText(resolved, after);
     this._invalidateRepoCaches();
+    const indexSync = this.ensureRepositoryIndexed({
+      reason: "edit",
+      force: true
+    });
 
     const changedIndex = after.indexOf(replacement);
     const preview = buildExcerptAroundIndex(after, changedIndex, {
@@ -817,11 +845,13 @@ export class ContextForge {
       replacements: replaceAll ? occurrences : 1,
       replaceAll,
       preview,
+      indexSync,
       summary: `Edited ${relativePath} with ${replaceAll ? occurrences : 1} replacement${replaceAll ? "s" : ""}.`
     };
   }
 
   async bash(command, options = {}) {
+    const beforeQuickStamp = this._currentQuickRepoStamp();
     const resolvedCwd = this._resolveWorkspaceCwd(options.cwd);
     const maxChars = clampNumber(options.maxChars, 400, 16000, 4000);
     const timeoutMs = clampNumber(options.timeoutMs, 250, 120000, 15000);
@@ -833,6 +863,14 @@ export class ContextForge {
     const stdoutPreview = compactCommandOutput(result.stdout, maxChars);
     const stderrPreview = compactCommandOutput(result.stderr, Math.max(800, Math.floor(maxChars / 2)));
     const relativeCwd = relativeTo(this.rootDir, resolvedCwd);
+    const afterQuickStamp = this._currentQuickRepoStamp();
+    const repoChanged = beforeQuickStamp !== afterQuickStamp;
+    const indexSync = repoChanged
+      ? this.ensureRepositoryIndexed({
+          reason: "bash",
+          force: true
+        })
+      : null;
 
     recordSessionEvent(this.db, {
       repoId: this.repoId,
@@ -853,6 +891,8 @@ export class ContextForge {
       timedOut: result.timedOut,
       stdoutPreview,
       stderrPreview,
+      repoChanged,
+      indexSync,
       summary: buildCommandSummary({
         command: String(command ?? ""),
         cwd: relativeCwd,
@@ -924,6 +964,7 @@ export class ContextForge {
   }
 
   doctor() {
+    this.ensureRepositoryIndexed({ reason: "doctor" });
     const fileCount = this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count;
     const symbolCount = this.db.prepare(`SELECT COUNT(*) AS count FROM symbols WHERE repo_id = ?`).get(this.repoId).count;
     const chunkCount = this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count;
@@ -943,6 +984,7 @@ export class ContextForge {
   }
 
   stats() {
+    this.ensureRepositoryIndexed({ reason: "stats" });
     const compression = this.db.prepare(`
       SELECT COUNT(*) AS count, SUM(raw_size) AS raw, SUM(compressed_size) AS compressed
       FROM compression_events
@@ -1269,6 +1311,25 @@ export class ContextForge {
       .join("\n"));
   }
 
+  _computeQuickRepoStamp(files) {
+    return sha1(files
+      .map((file) => {
+        let size = 0;
+        let modifiedAt = 0;
+        try {
+          const stat = fs.statSync(file.absolutePath);
+          size = stat.size;
+          modifiedAt = Math.trunc(stat.mtimeMs);
+        } catch {
+          size = 0;
+          modifiedAt = 0;
+        }
+        return `${file.relativePath}:${size}:${modifiedAt}`;
+      })
+      .sort()
+      .join("\n"));
+  }
+
   _canReuseIndex(repoFingerprint, fileCount) {
     const row = this.db.prepare(`
       SELECT content_fingerprint AS contentFingerprint, file_count AS fileCount
@@ -1298,6 +1359,7 @@ export class ContextForge {
     this._repoState = null;
     this._repoInventory = null;
     this._repoAudit = null;
+    this._quickRepoStamp = null;
     this._filePathById = null;
     for (const key of REPO_STATE_CACHE.keys()) {
       if (key.startsWith(`${this.repoId}:`)) {
@@ -1430,6 +1492,27 @@ export class ContextForge {
     return this._repoInventory;
   }
 
+  ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {
+    const counts = this._repoCounts();
+    const hasIndex = counts.filesIndexed > 0 && counts.chunksIndexed > 0;
+    const currentQuickStamp = this._currentQuickRepoStamp();
+
+    if (force || eagerPrime || !hasIndex || !this._quickRepoStamp || this._quickRepoStamp !== currentQuickStamp) {
+      return {
+        ...this.indexRepository({ force }),
+        syncReason: reason
+      };
+    }
+
+    return {
+      ...counts,
+      repoId: this.repoId,
+      reusedIndex: true,
+      fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
+      syncReason: reason
+    };
+  }
+
   _loadRepoAudit() {
     if (this._repoAudit) {
       return this._repoAudit;
@@ -1459,6 +1542,12 @@ export class ContextForge {
       fileDigests
     };
     return this._repoAudit;
+  }
+
+  _currentQuickRepoStamp() {
+    const inventory = loadRepositoryInventory(this.rootDir, this.repoId);
+    this._repoInventory = { files: inventory };
+    return this._computeQuickRepoStamp(inventory);
   }
 
   _resolveWorkspacePath(targetPath, options = {}) {

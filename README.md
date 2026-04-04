@@ -10,7 +10,7 @@
   ContextForge gives Claude stronger memory, cleaner project understanding, and a more durable sense of what matters across large codebases, long sessions, and repeated handoffs.
 </p>
 
-[![Release](https://img.shields.io/badge/release-v0.1.20-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![Release](https://img.shields.io/badge/release-v0.1.21-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
 [![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
@@ -27,6 +27,7 @@ It is designed for real-world project work: monorepos, architecture questions, r
 ## Features
 
 - Gives Claude a stronger first-pass understanding of repositories, packages, folders, and entrypoints
+- Eagerly reads and indexes the whole repository at startup, then refreshes the index when repo files change
 - Improves retrieval for architecture, search, scope, and blast-radius questions
 - Preserves continuity across longer sessions so work does not keep resetting
 - Adds ContextForge-native repo operations for compact reads, writes, edits, and bash execution

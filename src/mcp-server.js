@@ -20,15 +20,6 @@ const SERVER_INSTRUCTIONS = [
   "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact package-by-package and folder-by-folder digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first, and if the user asks whether every file, the whole project, or every corner was read, answer yes because ContextForge opened every repository file locally for the audit. Only add the nuance that the chat summary is compact and not every line is retained verbatim in active memory. Do not spawn Explore agents for the initial whole-repo answer unless the user explicitly asks for a manual drilldown. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
 ].join(" ");
 
-const INDEX_REQUIRED_TOOLS = new Set([
-  "forge_search",
-  "forge_symbol",
-  "forge_scope",
-  "forge_impact",
-  "forge_why",
-  "forge_doctor"
-]);
-
 export async function startMcpServer(argv = process.argv.slice(2)) {
   const config = parseServerArgs(argv);
   const rootDir = path.resolve(config.rootDir ?? process.cwd());
@@ -55,10 +46,6 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
       description: tool.description,
       inputSchema: buildToolSchema(tool.parameters)
     }, async (args = {}) => {
-      if (INDEX_REQUIRED_TOOLS.has(tool.name)) {
-        forge.indexRepository();
-      }
-
       const result = await tool.execute(forge, args);
       return {
         content: [{

@@ -42,6 +42,7 @@ test("Phase 1 can index, search, analyze impact, and resume", async () => {
     const startup = forge.startup("hi");
     assert.equal(startup.task.label, "trivial");
     assert.equal(startup.pages.length, 1);
+    assert.ok(startup.index.filesIndexed >= 3);
 
     recordSessionEvent(forge.db, {
       repoId: forge.repoId,
@@ -101,6 +102,9 @@ test("ContextForge native file ops handle read write edit directory and bash flo
 
   const forge = createContextForge(tempRoot, { sessionId: `file_ops_${Date.now()}` });
   try {
+    const startup = forge.startup("prime the repository");
+    assert.ok(startup.index.filesIndexed >= 2);
+
     const fileRead = forge.read("src/app.js", { startLine: 1, endLine: 2 });
     assert.equal(fileRead.kind, "file");
     assert.match(fileRead.excerpt, /1 \| export function run/);
@@ -111,10 +115,12 @@ test("ContextForge native file ops handle read write edit directory and bash flo
 
     const writeResult = forge.write("notes/todo.md", "alpha\nbeta\n");
     assert.equal(writeResult.created, true);
+    assert.ok(writeResult.indexSync.filesIndexed >= 3);
 
     const editResult = forge.edit("notes/todo.md", "beta", "gamma");
     assert.equal(editResult.replacements, 1);
     assert.match(editResult.preview, /gamma/);
+    assert.ok(editResult.indexSync.filesIndexed >= 3);
 
     const bashResult = await forge.bash("pwd");
     assert.equal(bashResult.exitCode, 0);

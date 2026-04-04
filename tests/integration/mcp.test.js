@@ -44,6 +44,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
       }
     });
     assert.ok(!startup.isError);
+    assert.match(startup.content[0].text, /filesIndexed/);
 
     const search = await client.callTool({
       name: "forge_search",

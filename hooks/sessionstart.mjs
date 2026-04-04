@@ -12,7 +12,7 @@ const additionalContext = `
   - resuming prior work in the same repository
 
   Tool preference:
-  - forge_start: warm up ContextForge for non-trivial repo tasks
+  - forge_start: warm up ContextForge for non-trivial repo tasks and eagerly read/index the whole repository at session start
   - forge_scan: fastest first-pass repo map for broad prompts about the whole project or monorepo
   - forge_understand: first choice for broad prompts like "understand this project", "understand the monorepo", "go through the repo", "all files", "folders", "packages", or "project structure". It auto-escalates for exhaustive prompts.
   - forge_walk: use for exhaustive whole-project prompts like "every file, folder, and subfolder", "walk the repo", or "go through each package/module". For explicit all-files requests it opens every repository file locally, reads text bodies, scans binary assets, and returns a compact repo digest before manual reads
@@ -28,7 +28,7 @@ const additionalContext = `
   - forge_resume or forge_session: session continuity
   - forge_stats or forge_doctor: health and diagnostics
 
-  For initial repo-overview questions, answer from forge_scan, forge_understand, or forge_walk first. If the user asks for every file or the whole repo exhaustively, treat forge_walk's audit as the authoritative first pass, answer from it before spawning Explore agents, and if the user asks "did you read every file?", "did you read the whole project?", or "did you read every corner of the files?" answer yes when forge_walk reports exhaustive coverage. Only then add the nuance that the chat answer is compact and not every line is retained verbatim in active message memory. For targeted file reads, exact edits, file writes, or shell commands that stay inside the repo, prefer forge_read, forge_edit, forge_write, or forge_bash before reaching for heavier built-in tool paths. Do not immediately fall back to manually reading many files or spawning Explore agents unless the user explicitly asks for a deeper drilldown or the ContextForge result is insufficient.
+  At session start, treat forge_start as the eager full-repository prime step: it should read and index the whole repo before deeper work begins. For initial repo-overview questions, answer from forge_scan, forge_understand, or forge_walk first. If the user asks for every file or the whole repo exhaustively, treat forge_walk's audit as the authoritative first pass, answer from it before spawning Explore agents, and if the user asks "did you read every file?", "did you read the whole project?", or "did you read every corner of the files?" answer yes when forge_walk reports exhaustive coverage. Only then add the nuance that the chat answer is compact and not every line is retained verbatim in active message memory. For targeted file reads, exact edits, file writes, or shell commands that stay inside the repo, prefer forge_read, forge_edit, forge_write, or forge_bash before reaching for heavier built-in tool paths. Do not immediately fall back to manually reading many files or spawning Explore agents unless the user explicitly asks for a deeper drilldown or the ContextForge result is insufficient.
 
   Do not switch to another MCP for repo structure, architecture, impact, or session-memory work unless ContextForge is unavailable or insufficient for the task.
 </contextforge_routing>`.trim();
