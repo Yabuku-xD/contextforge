@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { openDatabase } from "./storage/db.js";
-import { loadRepositoryFiles, loadRepositoryInventory } from "./indexing/files.js";
+import { loadRepositoryFile, loadRepositoryFiles, loadRepositoryInventory, loadRepositoryInventoryEntry } from "./indexing/files.js";
 import { parseSource } from "./indexing/tree-sitter.js";
 import { extractSymbols } from "./indexing/symbols.js";
 import { createFallbackFileArtifacts } from "./indexing/parser-fallback.js";
@@ -43,6 +43,8 @@ import { runShellCommand } from "./utils/process.js";
 const REPO_STATE_CACHE = new Map();
 const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
 const DEFAULT_FILE_OP_IGNORES = new Set([".git", ".contextforge", "node_modules"]);
+const MAX_INCREMENTAL_SYNC_PATHS = 128;
+const WATCHER_SETTLE_MS = 80;
 
 export class ContextForge {
   constructor(rootDir, options = {}) {
@@ -58,9 +60,15 @@ export class ContextForge {
     this._repoAudit = null;
     this._quickRepoStamp = null;
     this._filePathById = null;
+    this._watcher = undefined;
+    this._watcherSupported = false;
+    this._dirtyPaths = new Set();
+    this._inventoryDirty = false;
   }
 
   close() {
+    this._watcher?.close?.();
+    this._watcher = null;
     this.db.close();
   }
 
@@ -76,6 +84,8 @@ export class ContextForge {
       this._repoState = null;
       this._filePathById = null;
       this._quickRepoStamp = quickRepoStamp;
+      this._markRepoSynced();
+      this._ensureWatcher();
       recordSessionEvent(db, {
         repoId,
         sessionId: this.sessionId,
@@ -106,8 +116,8 @@ export class ContextForge {
       const allChunks = [];
 
       const insertFile = db.prepare(`
-        INSERT OR REPLACE INTO files (file_id, repo_id, file_path, file_hash, language, parse_status, parse_error, updated_at)
-        VALUES (@fileId, @repoId, @filePath, @fileHash, @language, @parseStatus, @parseError, @updatedAt)
+        INSERT OR REPLACE INTO files (file_id, repo_id, file_path, file_hash, content, language, parse_status, parse_error, updated_at)
+        VALUES (@fileId, @repoId, @filePath, @fileHash, @content, @language, @parseStatus, @parseError, @updatedAt)
       `);
       const insertSymbol = db.prepare(`
         INSERT OR REPLACE INTO symbols (symbol_id, repo_id, file_id, canonical_name, display_name, kind, language, span_start, span_end, parent_symbol_id, symbol_hash, body)
@@ -185,6 +195,7 @@ export class ContextForge {
           repoId,
           filePath: file.relativePath,
           fileHash: file.fileHash,
+          content: file.content,
           language: file.language,
           parseStatus,
           parseError,
@@ -250,8 +261,10 @@ export class ContextForge {
 
       db.exec("COMMIT");
       this._invalidateRepoCaches();
+      this._markRepoSynced();
       this.repoFingerprint = repoFingerprint;
       this._quickRepoStamp = quickRepoStamp;
+      this._ensureWatcher();
       return {
         repoId,
         filesIndexed: files.length,
@@ -769,11 +782,7 @@ export class ContextForge {
     const previousBytes = existed ? fs.statSync(resolved).size : 0;
 
     writeText(resolved, String(content ?? ""));
-    this._invalidateRepoCaches();
-    const indexSync = this.ensureRepositoryIndexed({
-      reason: "write",
-      force: true
-    });
+    const indexSync = this._syncChangedPaths([relativePath], { reason: "write" });
 
     recordSessionEvent(this.db, {
       repoId: this.repoId,
@@ -818,11 +827,7 @@ export class ContextForge {
       ? beforeNormalized.split(source).join(replacement)
       : beforeNormalized.replace(source, replacement);
     writeText(resolved, after);
-    this._invalidateRepoCaches();
-    const indexSync = this.ensureRepositoryIndexed({
-      reason: "edit",
-      force: true
-    });
+    const indexSync = this._syncChangedPaths([relativePath], { reason: "edit" });
 
     const changedIndex = after.indexOf(replacement);
     const preview = buildExcerptAroundIndex(after, changedIndex, {
@@ -851,7 +856,10 @@ export class ContextForge {
   }
 
   async bash(command, options = {}) {
-    const beforeQuickStamp = this._currentQuickRepoStamp();
+    const watcherAvailable = this._ensureWatcher();
+    const beforeQuickStamp = watcherAvailable
+      ? this._quickRepoStamp
+      : this._currentQuickRepoStamp();
     const resolvedCwd = this._resolveWorkspaceCwd(options.cwd);
     const maxChars = clampNumber(options.maxChars, 400, 16000, 4000);
     const timeoutMs = clampNumber(options.timeoutMs, 250, 120000, 15000);
@@ -863,9 +871,15 @@ export class ContextForge {
     const stdoutPreview = compactCommandOutput(result.stdout, maxChars);
     const stderrPreview = compactCommandOutput(result.stderr, Math.max(800, Math.floor(maxChars / 2)));
     const relativeCwd = relativeTo(this.rootDir, resolvedCwd);
-    const afterQuickStamp = this._currentQuickRepoStamp();
-    const repoChanged = beforeQuickStamp !== afterQuickStamp;
-    const indexSync = repoChanged
+    await this._settleWatcher();
+    const dirtyPaths = this._consumeDirtyPaths();
+    const afterQuickStamp = watcherAvailable && dirtyPaths.length
+      ? null
+      : this._currentQuickRepoStamp();
+    const repoChanged = dirtyPaths.length > 0 || beforeQuickStamp !== afterQuickStamp;
+    const indexSync = dirtyPaths.length
+      ? this._syncChangedPaths(dirtyPaths, { reason: "bash" })
+      : repoChanged
       ? this.ensureRepositoryIndexed({
           reason: "bash",
           force: true
@@ -964,36 +978,46 @@ export class ContextForge {
   }
 
   doctor() {
-    this.ensureRepositoryIndexed({ reason: "doctor" });
-    const fileCount = this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count;
-    const symbolCount = this.db.prepare(`SELECT COUNT(*) AS count FROM symbols WHERE repo_id = ?`).get(this.repoId).count;
-    const chunkCount = this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count;
+    const counts = this._repoCounts();
+    const indexed = counts.filesIndexed > 0;
+    const watcherAvailable = this._ensureWatcher();
     const pageCount = this.db.prepare(`SELECT COUNT(*) AS count FROM pages WHERE session_id = ?`).get(this.sessionId).count;
-    const parseFailures = this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ? AND parse_status = 'error'`).get(this.repoId).count;
+    const parseFailures = indexed
+      ? this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ? AND parse_status = 'error'`).get(this.repoId).count
+      : 0;
     return {
       rootDir: this.rootDir,
       repoId: this.repoId,
       sessionId: this.sessionId,
-      fileCount,
-      symbolCount,
-      chunkCount,
+      indexed,
+      fileCount: counts.filesIndexed,
+      symbolCount: counts.symbolsIndexed,
+      chunkCount: counts.chunksIndexed,
+      edgeCount: counts.edgesIndexed,
+      raptorNodeCount: counts.raptorNodesIndexed,
       pageCount,
       parseFailures,
+      dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
+      inventoryDirty: watcherAvailable ? this._inventoryDirty : null,
       embeddingModel: MODEL_METADATA.embeddings.default
     };
   }
 
   stats() {
-    this.ensureRepositoryIndexed({ reason: "stats" });
     const compression = this.db.prepare(`
       SELECT COUNT(*) AS count, SUM(raw_size) AS raw, SUM(compressed_size) AS compressed
       FROM compression_events
       WHERE repo_id = ? AND session_id = ?
     `).get(this.repoId, this.sessionId);
+    const counts = this._repoCounts();
+    const watcherAvailable = this._ensureWatcher();
     const retrieval = {
-      symbols: this.db.prepare(`SELECT COUNT(*) AS count FROM symbols WHERE repo_id = ?`).get(this.repoId).count,
-      edges: this.db.prepare(`SELECT COUNT(*) AS count FROM symbol_edges WHERE repo_id = ?`).get(this.repoId).count,
-      raptorNodes: this.db.prepare(`SELECT COUNT(*) AS count FROM raptor_nodes WHERE repo_id = ?`).get(this.repoId).count
+      files: counts.filesIndexed,
+      symbols: counts.symbolsIndexed,
+      edges: counts.edgesIndexed,
+      raptorNodes: counts.raptorNodesIndexed,
+      dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
+      inventoryDirty: watcherAvailable ? this._inventoryDirty : null
     };
     const session = {
       events: this.db.prepare(`SELECT COUNT(*) AS count FROM session_events WHERE repo_id = ? AND session_id = ?`).get(this.repoId, this.sessionId).count,
@@ -1077,6 +1101,213 @@ export class ContextForge {
       SELECT file_id AS fileId, file_path AS relativePath, language
       FROM files WHERE repo_id = ?
     `).all(this.repoId);
+  }
+
+  _loadIndexedFiles({ includeContent = false, includeHashes = false } = {}) {
+    const columns = [
+      "file_id AS fileId",
+      "file_path AS relativePath",
+      "language"
+    ];
+
+    if (includeHashes) {
+      columns.push("file_hash AS fileHash");
+    }
+
+    if (includeContent) {
+      columns.push("content");
+    }
+
+    return this.db.prepare(`
+      SELECT ${columns.join(", ")}
+      FROM files
+      WHERE repo_id = ?
+      ORDER BY file_path
+    `).all(this.repoId);
+  }
+
+  _materializeFileArtifacts(file) {
+    let parsed = null;
+    let fileArtifacts;
+    let parseStatus = "parsed";
+    let parseError = null;
+
+    try {
+      parsed = parseSource({
+        language: file.language,
+        filePath: file.absolutePath,
+        content: file.content
+      });
+
+      if (parsed) {
+        fileArtifacts = extractSymbols({
+          repoId: this.repoId,
+          fileId: file.fileId,
+          relativePath: file.relativePath,
+          language: file.language,
+          tree: parsed,
+          content: file.content
+        });
+
+        if (!fileArtifacts.symbols.length) {
+          fileArtifacts = createFallbackFileArtifacts({
+            repoId: this.repoId,
+            fileId: file.fileId,
+            relativePath: file.relativePath,
+            language: file.language,
+            content: file.content
+          });
+        }
+      } else {
+        parseStatus = "fallback";
+        fileArtifacts = createFallbackFileArtifacts({
+          repoId: this.repoId,
+          fileId: file.fileId,
+          relativePath: file.relativePath,
+          language: file.language,
+          content: file.content
+        });
+      }
+    } catch (error) {
+      parseStatus = "fallback";
+      parseError = error.message;
+      fileArtifacts = createFallbackFileArtifacts({
+        repoId: this.repoId,
+        fileId: file.fileId,
+        relativePath: file.relativePath,
+        language: file.language,
+        content: file.content
+      });
+    }
+
+    return {
+      parseStatus,
+      parseError,
+      symbols: fileArtifacts.symbols,
+      chunks: fileArtifacts.chunks
+    };
+  }
+
+  _deleteIndexedFile(fileId) {
+    const chunkIds = this.db.prepare(`
+      SELECT chunk_id AS chunkId
+      FROM chunks
+      WHERE repo_id = ? AND file_id = ?
+    `).all(this.repoId, fileId);
+
+    for (const { chunkId } of chunkIds) {
+      this.db.prepare(`DELETE FROM chunk_fts WHERE chunk_id = ?`).run(chunkId);
+      this.db.prepare(`
+        DELETE FROM vectors
+        WHERE repo_id = ? AND item_type = 'chunk' AND item_id = ?
+      `).run(this.repoId, chunkId);
+    }
+
+    this.db.prepare(`DELETE FROM chunks WHERE repo_id = ? AND file_id = ?`).run(this.repoId, fileId);
+    this.db.prepare(`DELETE FROM symbols WHERE repo_id = ? AND file_id = ?`).run(this.repoId, fileId);
+    this.db.prepare(`DELETE FROM files WHERE repo_id = ? AND file_id = ?`).run(this.repoId, fileId);
+  }
+
+  _upsertIndexedFile(file) {
+    this._deleteIndexedFile(file.fileId);
+
+    const artifacts = this._materializeFileArtifacts(file);
+    const insertFile = this.db.prepare(`
+      INSERT OR REPLACE INTO files (file_id, repo_id, file_path, file_hash, content, language, parse_status, parse_error, updated_at)
+      VALUES (@fileId, @repoId, @filePath, @fileHash, @content, @language, @parseStatus, @parseError, @updatedAt)
+    `);
+    const insertSymbol = this.db.prepare(`
+      INSERT OR REPLACE INTO symbols (symbol_id, repo_id, file_id, canonical_name, display_name, kind, language, span_start, span_end, parent_symbol_id, symbol_hash, body)
+      VALUES (@symbolId, @repoId, @fileId, @canonicalName, @displayName, @kind, @language, @spanStart, @spanEnd, @parentSymbolId, @symbolHash, @body)
+    `);
+    const insertChunk = this.db.prepare(`
+      INSERT OR REPLACE INTO chunks (chunk_id, repo_id, file_id, chunk_type, label, text, summary, span_start, span_end, chunk_hash, invalidation_state)
+      VALUES (@chunkId, @repoId, @fileId, @chunkType, @label, @text, @summary, @spanStart, @spanEnd, @chunkHash, @invalidationState)
+    `);
+    const insertFts = this.db.prepare(`
+      INSERT INTO chunk_fts (chunk_id, label, text)
+      VALUES (?, ?, ?)
+    `);
+    const insertVector = this.db.prepare(`
+      INSERT OR REPLACE INTO vectors (vector_id, repo_id, item_type, item_id, embedding_model, embedding_dim, embedding_json)
+      VALUES (@vectorId, @repoId, @itemType, @itemId, @embeddingModel, @embeddingDim, @embeddingJson)
+    `);
+
+    insertFile.run({
+      fileId: file.fileId,
+      repoId: this.repoId,
+      filePath: file.relativePath,
+      fileHash: file.fileHash,
+      content: file.content,
+      language: file.language,
+      parseStatus: artifacts.parseStatus,
+      parseError: artifacts.parseError,
+      updatedAt: Date.now()
+    });
+
+    for (const symbol of artifacts.symbols) {
+      insertSymbol.run(symbol);
+    }
+
+    for (const chunk of artifacts.chunks) {
+      insertChunk.run(chunk);
+      insertFts.run(chunk.chunkId, chunk.label, chunk.text);
+      insertVector.run({
+        vectorId: makeId("vector", chunk.chunkId),
+        repoId: this.repoId,
+        itemType: "chunk",
+        itemId: chunk.chunkId,
+        embeddingModel: MODEL_METADATA.embeddings.default.name,
+        embeddingDim: MODEL_METADATA.embeddings.default.dimension,
+        embeddingJson: JSON.stringify(embedText(chunk.text))
+      });
+    }
+  }
+
+  _rebuildDerivedStateFromIndex() {
+    const files = this._loadIndexedFiles({ includeContent: true, includeHashes: true });
+    const symbols = this._loadSymbols();
+    const pdgEdges = [
+      ...extractImportEdges({ repoId: this.repoId, symbols, files }),
+      ...extractCallEdges({ repoId: this.repoId, symbols, files }),
+      ...extractControlEdges({ repoId: this.repoId, symbols }),
+      ...extractDataFlowEdges({ repoId: this.repoId, symbols })
+    ];
+    const raptorNodes = buildRaptorTree({ repoId: this.repoId, files, symbols });
+    const repoFingerprint = this._computeRepoFingerprint(files);
+
+    this.db.prepare(`DELETE FROM symbol_edges WHERE repo_id = ?`).run(this.repoId);
+    this.db.prepare(`DELETE FROM raptor_nodes WHERE repo_id = ?`).run(this.repoId);
+
+    const insertEdge = this.db.prepare(`
+      INSERT OR REPLACE INTO symbol_edges (edge_id, repo_id, from_symbol_id, to_symbol_id, edge_type, confidence, provenance_source)
+      VALUES (@edgeId, @repoId, @fromSymbolId, @toSymbolId, @edgeType, @confidence, @provenanceSource)
+    `);
+    for (const edge of pdgEdges) {
+      insertEdge.run(edge);
+    }
+
+    const insertRaptor = this.db.prepare(`
+      INSERT OR REPLACE INTO raptor_nodes (node_id, repo_id, parent_node_id, node_type, label, summary, token_budget, source_item_type, source_item_id, cache_state)
+      VALUES (@nodeId, @repoId, @parentNodeId, @nodeType, @label, @summary, @tokenBudget, @sourceItemType, @sourceItemId, @cacheState)
+    `);
+    for (const node of raptorNodes) {
+      insertRaptor.run(node);
+    }
+
+    this.db.prepare(`
+      INSERT OR REPLACE INTO repositories (repo_id, root_path, default_branch, content_fingerprint, file_count, indexed_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(this.repoId, this.rootDir, "main", repoFingerprint, files.length, Date.now());
+
+    return {
+      repoFingerprint,
+      filesIndexed: files.length,
+      symbolsIndexed: symbols.length,
+      chunksIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count,
+      edgesIndexed: pdgEdges.length,
+      raptorNodesIndexed: raptorNodes.length
+    };
   }
 
   _buildWhySeeds(state, query) {
@@ -1330,6 +1561,75 @@ export class ContextForge {
       .join("\n"));
   }
 
+  _markRepoSynced() {
+    this._dirtyPaths.clear();
+    this._inventoryDirty = false;
+  }
+
+  _ensureWatcher() {
+    if (this._watcher !== undefined) {
+      return this._watcherSupported;
+    }
+
+    try {
+      this._watcher = fs.watch(this.rootDir, { recursive: true }, (_eventType, fileName) => {
+        this._handleWatchEvent(fileName);
+      });
+      this._watcher.unref?.();
+      this._watcherSupported = true;
+    } catch {
+      this._watcher = null;
+      this._watcherSupported = false;
+    }
+
+    return this._watcherSupported;
+  }
+
+  _handleWatchEvent(fileName) {
+    if (!fileName) {
+      this._inventoryDirty = true;
+      return;
+    }
+
+    const normalized = String(fileName).replace(/\\/g, "/").replace(/^\.?\//, "");
+    if (!normalized || normalized === "." || normalized.startsWith(".contextforge/")) {
+      return;
+    }
+
+    const segments = normalized.split("/");
+    if (segments.some((segment) => DEFAULT_FILE_OP_IGNORES.has(segment))) {
+      return;
+    }
+
+    const resolved = path.resolve(this.rootDir, normalized);
+    if (!resolved.startsWith(this.rootDir)) {
+      return;
+    }
+
+    if (exists(resolved) && fs.statSync(resolved).isDirectory()) {
+      this._inventoryDirty = true;
+      return;
+    }
+
+    this._dirtyPaths.add(normalized);
+  }
+
+  async _settleWatcher() {
+    if (!this._watcherSupported) {
+      return;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, WATCHER_SETTLE_MS);
+    });
+  }
+
+  _consumeDirtyPaths() {
+    const paths = [...this._dirtyPaths];
+    this._dirtyPaths.clear();
+    return paths;
+  }
+
   _canReuseIndex(repoFingerprint, fileCount) {
     const row = this.db.prepare(`
       SELECT content_fingerprint AS contentFingerprint, file_count AS fileCount
@@ -1495,13 +1795,35 @@ export class ContextForge {
   ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {
     const counts = this._repoCounts();
     const hasIndex = counts.filesIndexed > 0 && counts.chunksIndexed > 0;
-    const currentQuickStamp = this._currentQuickRepoStamp();
+    const watcherAvailable = this._ensureWatcher();
 
-    if (force || eagerPrime || !hasIndex || !this._quickRepoStamp || this._quickRepoStamp !== currentQuickStamp) {
+    if (force || eagerPrime || !hasIndex) {
       return {
         ...this.indexRepository({ force }),
         syncReason: reason
       };
+    }
+
+    if (watcherAvailable) {
+      if (this._inventoryDirty) {
+        this._inventoryDirty = false;
+        return {
+          ...this.indexRepository({ force: true }),
+          syncReason: reason
+        };
+      }
+
+      if (this._dirtyPaths.size) {
+        return this._syncChangedPaths(this._consumeDirtyPaths(), { reason });
+      }
+    } else {
+      const currentQuickStamp = this._currentQuickRepoStamp();
+      if (!this._quickRepoStamp || this._quickRepoStamp !== currentQuickStamp) {
+        return {
+          ...this.indexRepository({ force }),
+          syncReason: reason
+        };
+      }
     }
 
     return {
@@ -1544,7 +1866,102 @@ export class ContextForge {
     return this._repoAudit;
   }
 
+  _syncChangedPaths(paths, { reason = "sync" } = {}) {
+    if (this._inventoryDirty) {
+      this._inventoryDirty = false;
+      return {
+        ...this.indexRepository({ force: true }),
+        syncReason: reason,
+        syncMode: "full"
+      };
+    }
+
+    const normalizedPaths = unique(paths
+      .map((entry) => String(entry ?? "").replace(/\\/g, "/").replace(/^\.?\//, ""))
+      .filter(Boolean)
+      .filter((entry) => !entry.startsWith(".contextforge/"))
+      .filter((entry) => {
+        const segments = entry.split("/");
+        return !segments.some((segment) => DEFAULT_FILE_OP_IGNORES.has(segment));
+      }));
+
+    if (!normalizedPaths.length) {
+      return {
+        ...this._repoCounts(),
+        repoId: this.repoId,
+        reusedIndex: true,
+        fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
+        syncReason: reason,
+        syncMode: "noop"
+      };
+    }
+
+    if (normalizedPaths.length > MAX_INCREMENTAL_SYNC_PATHS) {
+      return {
+        ...this.indexRepository({ force: true }),
+        syncReason: reason,
+        syncMode: "full"
+      };
+    }
+
+    this.db.exec("BEGIN IMMEDIATE");
+
+    try {
+      for (const relativePath of normalizedPaths) {
+        const absolutePath = path.resolve(this.rootDir, relativePath);
+        const fileId = makeId("file", relativePath);
+
+        if (!exists(absolutePath)) {
+          this._deleteIndexedFile(fileId);
+          continue;
+        }
+
+        const stat = fs.statSync(absolutePath);
+        if (stat.isDirectory()) {
+          this._inventoryDirty = true;
+          continue;
+        }
+
+        const file = loadRepositoryFile(this.rootDir, this.repoId, absolutePath);
+        this._upsertIndexedFile(file);
+      }
+
+      const summary = this._rebuildDerivedStateFromIndex();
+      this.db.exec("COMMIT");
+      this._invalidateRepoCaches();
+      this._markRepoSynced();
+      this.repoFingerprint = summary.repoFingerprint;
+      if (!this._watcherSupported) {
+        this._quickRepoStamp = this._currentQuickRepoStamp();
+      } else {
+        this._quickRepoStamp = null;
+      }
+      this._ensureWatcher();
+      return {
+        repoId: this.repoId,
+        filesIndexed: summary.filesIndexed,
+        symbolsIndexed: summary.symbolsIndexed,
+        chunksIndexed: summary.chunksIndexed,
+        edgesIndexed: summary.edgesIndexed,
+        raptorNodesIndexed: summary.raptorNodesIndexed,
+        reusedIndex: false,
+        fingerprint: summary.repoFingerprint,
+        syncReason: reason,
+        syncMode: "incremental",
+        pathsChanged: normalizedPaths.length
+      };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      this._dirtyPaths = new Set([...this._dirtyPaths, ...normalizedPaths]);
+      throw error;
+    }
+  }
+
   _currentQuickRepoStamp() {
+    if (this._watcherSupported && !this._dirtyPaths.size && !this._inventoryDirty && this._quickRepoStamp) {
+      return this._quickRepoStamp;
+    }
+
     const inventory = loadRepositoryInventory(this.rootDir, this.repoId);
     this._repoInventory = { files: inventory };
     return this._computeQuickRepoStamp(inventory);

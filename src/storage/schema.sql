@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS files (
   repo_id TEXT NOT NULL,
   file_path TEXT NOT NULL,
   file_hash TEXT NOT NULL,
+  content TEXT,
   language TEXT,
   parse_status TEXT NOT NULL DEFAULT 'unparsed',
   parse_error TEXT,

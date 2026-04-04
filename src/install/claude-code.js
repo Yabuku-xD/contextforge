@@ -1,10 +1,12 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { exists, readText, writeText } from "../utils/fs.js";
+import { TOOL_REGISTRY } from "../tools/registry.js";
+import { ensureDir, exists, readText, writeText } from "../utils/fs.js";
 
 const DEFAULT_SERVER_NAME = "contextforge";
 const MCP_SERVER_PATH = fileURLToPath(new URL("../mcp-server.js", import.meta.url));
+const DEFAULT_PLUGIN_PREFIX = "mcp__plugin_contextforge_contextforge__";
 
 export function installClaudeCodeProject(targetDir = process.cwd(), options = {}) {
   const resolvedTarget = path.resolve(targetDir);
@@ -24,13 +26,17 @@ export function installClaudeCodeProject(targetDir = process.cwd(), options = {}
   config.mcpServers[serverName] = nextEntry;
 
   writeText(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  const permissions = mergeClaudeCodePermissions(resolvedTarget, { serverName });
 
   return {
     targetDir: resolvedTarget,
     configPath,
+    permissionsPath: permissions.configPath,
     serverName,
     serverPath: MCP_SERVER_PATH,
-    status: previousEntry ? (sameEntry(previousEntry, nextEntry) ? "unchanged" : "updated") : "created"
+    status: previousEntry ? (sameEntry(previousEntry, nextEntry) ? "unchanged" : "updated") : "created",
+    permissionsStatus: permissions.status,
+    allowedTools: permissions.allowedTools
   };
 }
 
@@ -54,4 +60,64 @@ function parseConfig(configPath) {
 
 function sameEntry(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function mergeClaudeCodePermissions(targetDir = process.cwd(), options = {}) {
+  const resolvedTarget = path.resolve(targetDir);
+  const settingsDir = path.join(resolvedTarget, ".claude");
+  const configPath = path.join(settingsDir, "settings.local.json");
+  const serverName = options.serverName ?? DEFAULT_SERVER_NAME;
+  const existedBefore = exists(configPath);
+
+  ensureDir(settingsDir);
+
+  const config = exists(configPath)
+    ? parseConfig(configPath)
+    : {};
+
+  if (!config.permissions || typeof config.permissions !== "object" || Array.isArray(config.permissions)) {
+    config.permissions = {};
+  }
+
+  if (!Array.isArray(config.permissions.allow)) {
+    config.permissions.allow = [];
+  }
+
+  if (!config.permissions.defaultMode) {
+    config.permissions.defaultMode = "dontAsk";
+  }
+
+  const previousAllow = new Set(config.permissions.allow);
+  const nextAllow = new Set(config.permissions.allow);
+  for (const permission of buildAllowedPermissionEntries(serverName)) {
+    nextAllow.add(permission);
+  }
+
+  config.permissions.allow = [...nextAllow].sort();
+  writeText(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+  return {
+    configPath,
+    status: previousAllow.size === nextAllow.size ? "unchanged" : existedBefore ? "updated" : "created",
+    allowedTools: [...nextAllow].length
+  };
+}
+
+function buildAllowedPermissionEntries(serverName) {
+  const localPrefix = `mcp__${sanitizeServerName(serverName)}__`;
+  const toolNames = Object.values(TOOL_REGISTRY).map((tool) => tool.name);
+  const permissions = new Set();
+
+  for (const toolName of toolNames) {
+    permissions.add(`${localPrefix}${toolName}`);
+    permissions.add(`${DEFAULT_PLUGIN_PREFIX}${toolName}`);
+  }
+
+  return [...permissions];
+}
+
+function sanitizeServerName(serverName) {
+  return String(serverName ?? DEFAULT_SERVER_NAME)
+    .trim()
+    .replace(/[^A-Za-z0-9_]/g, "_");
 }

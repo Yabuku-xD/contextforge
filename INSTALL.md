@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.21`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.22`.
 
 ## What This Guide Covers
 
@@ -63,8 +63,10 @@ After install, Claude can call ContextForge as:
 Runtime behavior:
 
 - `forge_start` eagerly reads and indexes the whole repository at session start
-- repo-aware tools refresh the index automatically when repository files change
-- `forge_write`, `forge_edit`, and repo-changing `forge_bash` flows sync the index after mutations
+- repo-aware tools reuse the live index and only fall back to a full rebuild when the repository watcher cannot reconcile changes cleanly
+- `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
+- repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
+- project installs also seed `.claude/settings.local.json` with pre-allowed ContextForge MCP tools and `permissions.defaultMode = "dontAsk"` to reduce repeat permission prompts
 
 ## 3. Claude Code Chat Commands
 

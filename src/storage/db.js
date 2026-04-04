@@ -22,6 +22,7 @@ export function openDatabase(rootDir) {
   ensureColumn(db, "repositories", "content_fingerprint", "TEXT");
   ensureColumn(db, "repositories", "file_count", "INTEGER");
   ensureColumn(db, "repositories", "indexed_at", "INTEGER");
+  ensureColumn(db, "files", "content", "TEXT");
   ensureColumn(db, "compression_events", "repo_id", "TEXT");
   ensureColumn(db, "compression_events", "session_id", "TEXT");
   return db;

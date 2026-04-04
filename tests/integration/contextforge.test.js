@@ -116,11 +116,13 @@ test("ContextForge native file ops handle read write edit directory and bash flo
     const writeResult = forge.write("notes/todo.md", "alpha\nbeta\n");
     assert.equal(writeResult.created, true);
     assert.ok(writeResult.indexSync.filesIndexed >= 3);
+    assert.equal(writeResult.indexSync.syncMode, "incremental");
 
     const editResult = forge.edit("notes/todo.md", "beta", "gamma");
     assert.equal(editResult.replacements, 1);
     assert.match(editResult.preview, /gamma/);
     assert.ok(editResult.indexSync.filesIndexed >= 3);
+    assert.equal(editResult.indexSync.syncMode, "incremental");
 
     const bashResult = await forge.bash("pwd");
     assert.equal(bashResult.exitCode, 0);
