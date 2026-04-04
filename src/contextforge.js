@@ -297,12 +297,23 @@ export class ContextForge {
 
   startup(message) {
     const task = classifyStartup(message);
-    const index = this._shouldDeferStartupPrime(task)
-      ? this._queueDeferredStartupPrime("startup")
-      : this.ensureRepositoryIndexed({
-          reason: "startup",
-          eagerPrime: true
-        });
+    let index;
+    try {
+      index = this._shouldDeferStartupPrime(task)
+        ? this._queueDeferredStartupPrime("startup")
+        : this.ensureRepositoryIndexed({
+            reason: "startup",
+            eagerPrime: true
+          });
+    } catch (error) {
+      if (!isDatabaseLockError(error)) {
+        throw error;
+      }
+      index = this._buildDeferredIndexFallback({
+        reason: "startup",
+        note: "ContextForge could not read live warm-index progress because SQLite is temporarily write-locked. Returning the last known warm-up state."
+      });
+    }
     const preloadPlan = this._startupPreloadPlan(message, task);
     const pages = [
       createPage({
@@ -1851,6 +1862,69 @@ export class ContextForge {
     };
   }
 
+  _buildDeferredIndexFallback({ reason = "tool", status = null, estimatedFileCount = null, note = null } = {}) {
+    try {
+      const row = this._readRepositoryRow();
+      const counts = this._repoCounts();
+      return {
+        ...this._buildIndexProgressSummary(row, counts),
+        syncReason: reason,
+        status: status ?? this._deferredIndexState?.status ?? row?.indexStatus ?? "warming",
+        deferred: true,
+        estimatedFileCount: estimatedFileCount ?? this._deferredIndexState?.estimatedFileCount ?? row?.fileCount ?? counts.filesIndexed,
+        batchSize: row?.batchSize ?? null,
+        note: note ?? "ContextForge is still warming the repository index in the background."
+      };
+    } catch (error) {
+      if (!isDatabaseLockError(error)) {
+        throw error;
+      }
+    }
+
+    const filesTotal = estimatedFileCount ?? this._deferredIndexState?.estimatedFileCount ?? 0;
+    const effectiveStatus = status ?? this._deferredIndexState?.status ?? "warming";
+    return {
+      repoId: this.repoId,
+      filesIndexed: 0,
+      symbolsIndexed: 0,
+      chunksIndexed: 0,
+      edgesIndexed: 0,
+      raptorNodesIndexed: 0,
+      reusedIndex: false,
+      fingerprint: null,
+      quickRepoStamp: null,
+      indexStatus: effectiveStatus === "error" ? "error" : "warming",
+      indexedFileCount: 0,
+      filesTotal,
+      pendingDerivedState: true,
+      batchSize: null,
+      lastIndexError: null,
+      contentCoverage: {
+        status: effectiveStatus === "error" ? "error" : "warming",
+        complete: false,
+        filesTotal,
+        filesIndexed: 0,
+        textFilesIndexed: 0,
+        binaryFilesIndexed: 0,
+        fullTextBodiesStored: 0,
+        binaryAssetsScanned: 0,
+        indexedLineCount: 0,
+        indexedByteCount: 0,
+        allFilesPersisted: false,
+        allTextBodiesPersisted: false,
+        allBinaryAssetsScanned: false,
+        awaitingSync: true,
+        canAnswerYesToRememberingWholeProject: false,
+        reminder: "ContextForge is still warming the persistent index, so it should not claim complete remembered coverage yet."
+      },
+      syncReason: reason,
+      status: effectiveStatus,
+      deferred: true,
+      estimatedFileCount: filesTotal,
+      note: note ?? "ContextForge is still warming the repository index in the background."
+    };
+  }
+
   _canReuseIndex(quickRepoStamp, fileCount) {
     const row = this._readRepositoryRow();
 
@@ -2183,31 +2257,32 @@ export class ContextForge {
         estimatedFileCount,
         syncReason: reason
       };
-      this._writeRepositoryRow({
-        quickRepoStamp,
-        fileCount: estimatedFileCount,
-        indexedFileCount: this._repoCounts().filesIndexed,
-        indexStatus: "warming",
-        pendingDerivedState: 1,
-        lastIndexError: null,
-        batchSize,
-        indexedAt: null,
-        lastIndexStartedAt: Date.now(),
-        lastIndexCompletedAt: null
-      });
+      try {
+        this._writeRepositoryRow({
+          quickRepoStamp,
+          fileCount: estimatedFileCount,
+          indexedFileCount: this._repoCounts().filesIndexed,
+          indexStatus: "warming",
+          pendingDerivedState: 1,
+          lastIndexError: null,
+          batchSize,
+          indexedAt: null,
+          lastIndexStartedAt: Date.now(),
+          lastIndexCompletedAt: null
+        });
+      } catch (error) {
+        if (!isDatabaseLockError(error)) {
+          throw error;
+        }
+      }
       this._spawnDeferredStartupPrime(reason, estimatedFileCount, batchSize);
     }
-
-    const row = this._readRepositoryRow();
-    return {
-      ...this._buildIndexProgressSummary(row),
-      syncReason: reason,
+    return this._buildDeferredIndexFallback({
+      reason,
       status: this._deferredIndexState?.status ?? "queued",
-      deferred: true,
       estimatedFileCount,
-      batchSize: row?.batchSize ?? batchSize,
       note: "Large repository detected. ContextForge queued the full eager prime in the background so forge_start can return immediately."
-    };
+    });
   }
 
   _spawnDeferredStartupPrime(reason, estimatedFileCount, batchSize) {
@@ -2236,31 +2311,54 @@ export class ContextForge {
       if (this._closed) {
         return;
       }
+      try {
+        if (code === 0) {
+          const row = this._readRepositoryRow();
+          const counts = this._repoCounts();
+          this._deferredIndexState = {
+            status: row?.indexStatus ?? "ready",
+            estimatedFileCount,
+            syncReason: reason,
+            ...this._buildIndexProgressSummary(row, counts)
+          };
+          return;
+        }
 
-      if (code === 0) {
-        const row = this._readRepositoryRow();
-        const counts = this._repoCounts();
         this._deferredIndexState = {
-          status: row?.indexStatus ?? "ready",
+          status: "error",
           estimatedFileCount,
           syncReason: reason,
-          ...this._buildIndexProgressSummary(row, counts)
+          error: `Background prime exited with code ${code ?? "unknown"}`
         };
-        return;
+      } catch (error) {
+        if (!isDatabaseLockError(error)) {
+          throw error;
+        }
+        this._deferredIndexState = {
+          status: "warming",
+          estimatedFileCount,
+          syncReason: reason,
+          note: "Background prime finished, but live progress could not be read because SQLite was temporarily write-locked."
+        };
       }
-
-      this._deferredIndexState = {
-        status: "error",
-        estimatedFileCount,
-        syncReason: reason,
-        error: `Background prime exited with code ${code ?? "unknown"}`
-      };
     });
   }
 
   ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {
-    const counts = this._repoCounts();
-    const repoRow = this._readRepositoryRow();
+    let counts;
+    let repoRow;
+    try {
+      counts = this._repoCounts();
+      repoRow = this._readRepositoryRow();
+    } catch (error) {
+      if (!isDatabaseLockError(error)) {
+        throw error;
+      }
+      return this._buildDeferredIndexFallback({
+        reason,
+        note: "ContextForge could not read live index progress because SQLite is temporarily write-locked. Returning the last known warm-up state."
+      });
+    }
     const hasIndex = counts.filesIndexed > 0 && counts.chunksIndexed > 0;
     const watcherAvailable = this._ensureWatcher();
 
