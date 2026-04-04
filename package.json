@@ -1,6 +1,6 @@
 {
   "name": "contextforge",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Claude-first context optimizer for code agents",
   "license": "MIT",
   "homepage": "https://github.com/Yabuku-xD/contextforge",
@@ -18,7 +18,7 @@
     "contextforge-mcp": "./src/mcp-server.js"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1",
+    "test": "find tests -name '*.test.js' -print0 | xargs -0 node --test --test-concurrency=1",
     "bench": "node ./src/cli.js benchmark ./tests/fixtures/sample-app",
     "bench:repo": "node ./src/cli.js benchmark .",
     "compare": "node ./src/cli.js compare ./tests/fixtures/sample-app",

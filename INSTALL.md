@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.28`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.29`.
 
 ## What This Guide Covers
 
@@ -65,6 +65,7 @@ The plugin includes:
 - marketplace metadata in [.claude-plugin/marketplace.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/marketplace.json)
 - a stdio MCP definition in [.mcp.json](/Users/yabuku/Downloads/context-forge/.mcp.json)
 - SessionStart routing guidance in [hooks/sessionstart.mjs](/Users/yabuku/Downloads/context-forge/hooks/sessionstart.mjs)
+- PreToolUse routing guards in [hooks/pretooluse.mjs](/Users/yabuku/Downloads/context-forge/hooks/pretooluse.mjs)
 
 After install, Claude can call ContextForge as:
 
@@ -79,6 +80,7 @@ Runtime behavior:
 - repo-aware tools reuse the live index and only fall back to a full rebuild when the repository watcher cannot reconcile changes cleanly
 - `forge_write` and `forge_edit` perform targeted index syncs for touched files instead of forcing a full repository re-read
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
+- broad repo-crawl attempts through built-in `Agent`, `Task`, `Bash`, `Read`, or `Grep` are now steered back toward compact ContextForge discovery flows first
 - project installs seed `.claude/settings.local.json` with the safe read/search-style ContextForge allowlist so `dontAsk` mode does not hard-deny repo-understanding tools
   Mutation and shell tools stay opt-in. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
 

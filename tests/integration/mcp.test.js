@@ -82,7 +82,9 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     });
     assert.ok(!walk.isError);
     assert.match(walk.content[0].text, /exhaustive repository digest|inspected .* repository files locally/i);
-    assert.ok(walk.content[0].text.length < 25000);
+    assert.ok(walk.content[0].text.length < 12000);
+    assert.match(walk.content[0].text, /receipt_first/);
+    assert.match(walk.content[0].text, /firstAnswerWordLimit/);
 
     const read = await client.callTool({
       name: "forge_read",

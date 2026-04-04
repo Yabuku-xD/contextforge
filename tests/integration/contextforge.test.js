@@ -63,7 +63,24 @@ test("Phase 1 can index, search, analyze impact, and resume", async () => {
 });
 
 test("ContextForge can index and understand the repository hosting itself", async () => {
-  const forge = createContextForge(repoRoot, { sessionId: `self_hosted_${Date.now()}` });
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-self-hosted-"));
+  fs.cpSync(repoRoot, tempRoot, {
+    recursive: true,
+    filter(sourcePath) {
+      const relative = path.relative(repoRoot, sourcePath);
+      if (!relative) {
+        return true;
+      }
+
+      return ![
+        ".git",
+        ".contextforge",
+        "node_modules"
+      ].some((prefix) => relative === prefix || relative.startsWith(`${prefix}${path.sep}`));
+    }
+  });
+
+  const forge = createContextForge(tempRoot, { sessionId: `self_hosted_${Date.now()}` });
   try {
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.filesIndexed > 0);
@@ -96,6 +113,7 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.equal(routed.mode, "exhaustive_walk");
   } finally {
     forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 

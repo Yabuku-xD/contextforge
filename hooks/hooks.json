@@ -1,6 +1,53 @@
 {
-  "description": "ContextForge hooks — SessionStart routing guidance for repo understanding, architecture, impact analysis, and session continuity",
+  "description": "ContextForge hooks — SessionStart and PreToolUse routing guidance for low-context repo understanding, architecture, impact analysis, and session continuity",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
