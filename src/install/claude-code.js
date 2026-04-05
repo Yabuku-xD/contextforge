@@ -1,4 +1,5 @@
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { TOOL_REGISTRY } from "../tools/registry.js";
@@ -7,6 +8,8 @@ import { ensureDir, exists, readText, writeText } from "../utils/fs.js";
 const DEFAULT_SERVER_NAME = "contextforge";
 const MCP_SERVER_PATH = fileURLToPath(new URL("../mcp-server.js", import.meta.url));
 const DEFAULT_PLUGIN_PREFIX = "mcp__plugin_contextforge_contextforge__";
+const STRONG_PROJECT_MARKERS = [".claude", ".mcp.json", ".git"];
+const WEAK_PROJECT_MARKERS = ["package.json", "README.md", "pyproject.toml", "Cargo.toml", "go.mod"];
 const MUTATING_TOOL_NAMES = new Set([
   "forge_batch",
   "forge_write",
@@ -126,6 +129,50 @@ export function mergeClaudeCodePermissions(targetDir = process.cwd(), options = 
   };
 }
 
+export function syncClaudeCodePermissions(startDir = process.cwd(), options = {}) {
+  const targets = findClaudeProjectTargets(startDir);
+  return targets.map((targetDir) => mergeClaudeCodePermissions(targetDir, options));
+}
+
+export function findClaudeProjectTargets(startDir = process.cwd()) {
+  const resolvedStart = path.resolve(startDir);
+  if (!exists(resolvedStart)) {
+    return [];
+  }
+
+  const homeDir = path.resolve(os.homedir());
+  let current = resolvedStart;
+  let strongTarget = null;
+  let weakTarget = null;
+
+  while (current && current !== homeDir) {
+    if (!strongTarget && hasProjectMarker(current, STRONG_PROJECT_MARKERS)) {
+      strongTarget = current;
+      break;
+    }
+
+    if (!weakTarget && hasProjectMarker(current, WEAK_PROJECT_MARKERS)) {
+      weakTarget = current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+
+  if (strongTarget) {
+    return [strongTarget];
+  }
+
+  if (weakTarget) {
+    return [weakTarget];
+  }
+
+  return [];
+}
+
 function buildAllowedPermissionEntries(serverName, options = {}) {
   const localPrefix = `mcp__${sanitizeServerName(serverName)}__`;
   const toolNames = Object.values(TOOL_REGISTRY)
@@ -139,6 +186,10 @@ function buildAllowedPermissionEntries(serverName, options = {}) {
   }
 
   return [...permissions];
+}
+
+function hasProjectMarker(targetDir, markers) {
+  return markers.some((entry) => exists(path.join(targetDir, entry)));
 }
 
 function sanitizeServerName(serverName) {

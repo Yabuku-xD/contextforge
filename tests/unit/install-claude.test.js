@@ -4,7 +4,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { installClaudeCodeProject, mergeClaudeCodePermissions } from "../../src/install/claude-code.js";
+import {
+  findClaudeProjectTargets,
+  installClaudeCodeProject,
+  mergeClaudeCodePermissions,
+  syncClaudeCodePermissions
+} from "../../src/install/claude-code.js";
 
 function writableTempBase() {
   const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
@@ -104,4 +109,36 @@ test("mergeClaudeCodePermissions preserves existing project-local Claude setting
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
+});
+
+test("findClaudeProjectTargets resolves the nearest real project root from nested folders", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-targets-"));
+  const projectRoot = path.join(tempDir, "workspace");
+  const nestedDir = path.join(projectRoot, "apps", "web", "src");
+  fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+  fs.mkdirSync(nestedDir, { recursive: true });
+
+  const targets = findClaudeProjectTargets(nestedDir);
+
+  assert.deepEqual(targets, [projectRoot]);
+});
+
+test("syncClaudeCodePermissions writes the safe allowlist into the detected project root", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-sync-"));
+  const projectRoot = path.join(tempDir, "workspace");
+  const nestedDir = path.join(projectRoot, "apps", "web", "src");
+  fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+  fs.mkdirSync(nestedDir, { recursive: true });
+
+  const results = syncClaudeCodePermissions(nestedDir, {
+    allowMutations: false,
+    dontAsk: false
+  });
+  const settingsPath = path.join(projectRoot, ".claude", "settings.local.json");
+  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].configPath, settingsPath);
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
 });

@@ -89,8 +89,8 @@ test("pretooluse nudges broad repo discovery back toward ContextForge", () => {
 
   const payload = JSON.parse(output);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
-  assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(payload.hookSpecificOutput.permissionDecisionReason, /ContextForge/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /ContextForge/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /permission-denied/i);
 });
 
 test("pretooluse routes output-heavy bash toward forge_batch", () => {
@@ -110,6 +110,6 @@ test("pretooluse routes output-heavy bash toward forge_batch", () => {
 
   const payload = JSON.parse(output);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
-  assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(payload.hookSpecificOutput.permissionDecisionReason, /forge_batch/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_batch/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /permission-denied/i);
 });

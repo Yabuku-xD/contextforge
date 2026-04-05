@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mergeClaudeCodePermissions } from "../src/install/claude-code.js";
+import { syncClaudeCodePermissions } from "../src/install/claude-code.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
@@ -160,7 +160,7 @@ function syncProjectPermissions() {
   }
 
   try {
-    mergeClaudeCodePermissions(targetDir, {
+    syncClaudeCodePermissions(targetDir, {
       allowMutations: false,
       dontAsk: false
     });
@@ -175,13 +175,5 @@ function shouldSyncProjectPermissions(targetDir) {
   if (!targetDir || !fs.existsSync(targetDir)) {
     return false;
   }
-
-  const resolvedTarget = path.resolve(targetDir);
-  const homeDir = path.resolve(os.homedir());
-  if (resolvedTarget === homeDir) {
-    return false;
-  }
-
-  const markers = [".git", ".claude", ".mcp.json", "package.json", "README.md"];
-  return markers.some((entry) => fs.existsSync(path.join(resolvedTarget, entry)));
+  return path.resolve(targetDir) !== path.resolve(os.homedir());
 }

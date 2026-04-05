@@ -106,6 +106,7 @@ function createRepoRoutingGuidance(toolName) {
     "ContextForge is the preferred path for repository-wide discovery and architecture work.",
     "For broad repo understanding, use forge_start first, then forge_scan, forge_understand, or forge_walk instead of noisy manual exploration.",
     "Keep the first whole-repo answer compact: coverage verdict, top-level architecture, major areas, and key entrypoints only.",
+    "If ContextForge is unavailable or permission-denied, fall back to narrower built-in reads instead of broad recursive crawling.",
     `Current tool: ${toolName}. Use it only if ContextForge is insufficient for the task.`,
     "</contextforge_pretooluse>"
   ].join("\n");
@@ -118,6 +119,7 @@ function createResearchRoutingGuidance(toolName) {
     "Use forge_batch to run commands and keep raw output in ContextForge's local research index.",
     "Use forge_lookup for follow-up questions instead of replaying logs or diffs into chat.",
     "Keep the first answer short: receipt, key findings, and next step only.",
+    "If ContextForge is unavailable or permission-denied, use narrower built-in commands and avoid dumping large raw output into chat.",
     `Current tool: ${toolName}. Use it only if ContextForge is insufficient for the task.`,
     "</contextforge_research>"
   ].join("\n");
@@ -147,13 +149,9 @@ if ((toolName === "Agent" || toolName === "Task") && isWholeRepoRequest(toolText
 } else if (toolName === "Bash") {
   const command = normalizeText(toolInput.command ?? toolInput);
   if (isBroadDiscoveryCommand(command)) {
-    response = formatDeny(
-      "Broad repository crawling through Bash wastes context. Use ContextForge forge_scan, forge_understand, or forge_walk for repo-wide discovery."
-    );
+    response = formatContext(createRepoRoutingGuidance(toolName));
   } else if (isOutputHeavyCommand(command)) {
-    response = formatDeny(
-      "Large Bash output wastes context. Use ContextForge forge_batch first, then forge_lookup for follow-up questions."
-    );
+    response = formatContext(createResearchRoutingGuidance(toolName));
   } else if (isWholeRepoRequest(command)) {
     response = formatContext(createRepoRoutingGuidance(toolName));
   }
