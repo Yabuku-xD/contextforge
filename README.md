@@ -12,7 +12,7 @@
   session continuity, and repo-native file operations that do not flood the chat window.
 </p>
 
-[![Release](https://img.shields.io/badge/release-v0.1.36-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![Release](https://img.shields.io/badge/release-v0.1.37-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
 [![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
@@ -29,6 +29,7 @@
 - [How It Works](#how-it-works)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Command Reference](#command-reference)
 - [Tool Families](#tool-families)
 - [Documentation](#documentation)
 - [License](#license)
@@ -190,6 +191,45 @@ node ./src/cli.js serve .
 | Low-context research | `forge_batch`, `forge_lookup` |
 | Repo-native operations | `forge_read`, `forge_write`, `forge_edit`, `forge_bash` |
 | Multi-repo and generated artifacts | `forge_list_repos`, `forge_group_query`, `forge_group_status`, `forge_map`, `forge_contracts`, `forge_wiki` |
+
+[⬆ back to top](#readme)
+
+<a id="command-reference"></a>
+## Command Reference
+
+These are the user-facing chat commands exposed by the plugin. In normal use, natural-language prompts should auto-route to the same tools, but the slash commands are the most explicit way to trigger a specific ContextForge path.
+
+| Command | Purpose |
+| --- | --- |
+| `/contextforge:contextforge [request]` | General router. Best default entry when you want ContextForge to choose the right repo-aware command for the task. |
+| `/contextforge:forge-start [request]` | Warm ContextForge for the current repo and report index status or readiness. |
+| `/contextforge:forge-scan [request]` | Fast first-pass repo overview: top-level structure, likely entrypoints, and where to start. |
+| `/contextforge:forge-understand [request]` | Broad repo understanding for architecture, major areas, important packages, and key files. |
+| `/contextforge:forge-walk [request]` | Exhaustive repo walk for whole-project prompts like every file, folder, and subfolder. |
+| `/contextforge:forge-search [query]` | Find where a behavior, file, or code path is implemented. |
+| `/contextforge:forge-symbol [query]` | Jump to an exact or fuzzy symbol such as a function, class, or identifier. |
+| `/contextforge:forge-scope [query]` | Explain high-level structure, module relationships, and architectural scope. |
+| `/contextforge:forge-impact [query]` | Show blast radius: what breaks or what else is affected if something changes. |
+| `/contextforge:forge-why [query]` | Explain why a file, symbol, or behavior matters in the repo or current task. |
+| `/contextforge:forge-changes [request]` | Summarize git changes and map them to files, symbols, and likely impact areas. |
+| `/contextforge:forge-rename [request]` | Preview or apply a coordinated repository rename. |
+| `/contextforge:forge-batch [request]` | Run shell-heavy research, tests, logs, or diffs without dumping raw output into chat. |
+| `/contextforge:forge-lookup [query]` | Search stored output from earlier `forge_batch` runs. |
+| `/contextforge:forge-read [path]` | Read a compact file excerpt or list a directory inside the repo. |
+| `/contextforge:forge-write [instruction]` | Create or overwrite a file inside the repository. |
+| `/contextforge:forge-edit [instruction]` | Apply an exact in-file text replacement with compact confirmation. |
+| `/contextforge:forge-bash [command]` | Run a short repo-local shell command with compact output. |
+| `/contextforge:forge-map [request]` | Generate a repository architecture map artifact. |
+| `/contextforge:forge-contracts [request]` | Generate dependency and integration contract summaries between repo areas. |
+| `/contextforge:forge-wiki [request]` | Generate living wiki-style documentation from the current index. |
+| `/contextforge:forge-list-repos` | List repositories known to the global ContextForge registry. |
+| `/contextforge:forge-group-query [request]` | Search across repositories in a named ContextForge group. |
+| `/contextforge:forge-group-status [group]` | Show index and coverage status for repos in a ContextForge group. |
+| `/contextforge:forge-session [query]` | Inspect current session memory, touched files, and recent session context. |
+| `/contextforge:forge-resume` | Resume the current repository session with a compact summary. |
+| `/contextforge:forge-stats` | Show compression, retrieval, pager, and repository runtime stats. |
+| `/contextforge:forge-doctor` | Diagnose ContextForge installation, plugin health, and repo state. |
+| `/contextforge:forge-tools [tool name]` | List available ContextForge tools or inspect one tool schema. |
 
 [⬆ back to top](#readme)
 
