@@ -12,16 +12,13 @@
   session continuity, and repo-native file operations that do not flood the chat window.
 </p>
 
-[![Release](https://img.shields.io/github/v/release/Yabuku-xD/contextforge?style=flat-square)](https://github.com/Yabuku-xD/contextforge/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-22.5%2B-blue?style=flat-square)](https://nodejs.org/)
-[![Stars](https://img.shields.io/github/stars/Yabuku-xD/contextforge?style=social)](https://github.com/Yabuku-xD/contextforge)
+[![Release](https://img.shields.io/badge/release-v0.1.34-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
+[![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
+[![GitHub Stars](https://img.shields.io/github/stars/Yabuku-xD/contextforge?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
 
 </div>
-
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![MCP](https://img.shields.io/badge/MCP-Claude_Code-4B5563?style=for-the-badge)
 
 <a id="table-of-contents"></a>
 ## Table of Contents
