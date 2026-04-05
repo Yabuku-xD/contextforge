@@ -87,5 +87,16 @@ export function buildRepoGraph({ repoId, files, symbols, pdgEdges, raptorNodes =
     });
   }
 
-  return { nodes, edges };
+  return { nodes, edges: dedupeEdges(edges) };
+}
+
+function dedupeEdges(edges) {
+  const seen = new Set();
+  return edges.filter((edge) => {
+    if (seen.has(edge.edgeId)) {
+      return false;
+    }
+    seen.add(edge.edgeId);
+    return true;
+  });
 }

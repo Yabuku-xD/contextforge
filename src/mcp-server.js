@@ -6,6 +6,7 @@ import * as z from "zod/v4";
 import packageMeta from "../package.json" with { type: "json" };
 
 import { createContextForge } from "./contextforge.js";
+import { registerContextForgeResources } from "./mcp-resources.js";
 import { TOOL_REGISTRY } from "./tools/registry.js";
 import { rememberActiveSession, resolveRuntimeSessionId } from "./session/runtime.js";
 
@@ -17,7 +18,7 @@ const SERVER_INFO = {
 const SERVER_INSTRUCTIONS = [
   "ContextForge is a Claude-first code-context server for repository search, architecture lookup, impact analysis, and session continuity.",
   "Use forge_start near the beginning of non-trivial tasks to establish paging and session state. On large repositories, forge_start may queue the eager full-repository prime in the background and return immediately; that is not a failure.",
-  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 220 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents for the initial whole-repo answer unless the user explicitly asks for a manual drilldown. For shell-heavy research, logs, diffs, test output, or multi-command discovery, prefer forge_batch first and use forge_lookup for follow-up questions so raw output stays in ContextForge's local research index instead of flooding chat. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity."
+  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 220 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents for the initial whole-repo answer unless the user explicitly asks for a manual drilldown. For shell-heavy research, logs, diffs, test output, or multi-command discovery, prefer forge_batch first and use forge_lookup for follow-up questions so raw output stays in ContextForge's local research index instead of flooding chat. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Use forge_search for behavior or file lookup, forge_symbol for exact symbol names, forge_scope for architecture questions, forge_impact for blast radius, forge_changes for git-aware change mapping, forge_rename for coordinated renames, forge_map or forge_contracts for generated architecture artifacts, forge_why for repo-plus-session causality, and forge_resume or forge_session for continuity. Read ContextForge resources when you need structured overviews of the repo, areas, flows, schema, groups, or generated artifacts."
 ].join(" ");
 
 export async function startMcpServer(argv = process.argv.slice(2)) {
@@ -37,7 +38,7 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
   }
 
   const server = new McpServer(SERVER_INFO, {
-    capabilities: { logging: {} },
+    capabilities: { logging: {}, resources: {} },
     instructions: SERVER_INSTRUCTIONS
   });
 
@@ -57,6 +58,8 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
       };
     });
   }
+
+  registerContextForgeResources(server, forge);
 
   const transport = new StdioServerTransport();
 

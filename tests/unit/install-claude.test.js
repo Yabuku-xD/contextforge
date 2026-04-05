@@ -59,6 +59,7 @@ test("installClaudeCodeProject creates or merges a Claude Code mcp config", () =
   assert.ok(settings.permissions.allow.includes("mcp__contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_batch"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
@@ -76,6 +77,7 @@ test("installClaudeCodeProject can opt into mutation approvals and dontAsk mode"
   assert.equal(result.mutatingToolsAllowed, true);
   assert.equal(result.defaultMode, "dontAsk");
   assert.equal(settings.permissions.defaultMode, "dontAsk");
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_batch"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));

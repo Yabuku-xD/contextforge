@@ -54,6 +54,8 @@ export function extractSymbols({ repoId, fileId, relativePath, language, tree, c
       kind: node.type,
       language,
       ...span,
+      startLine: node.startPosition.row + 1,
+      endLine: node.endPosition.row + 1,
       parentSymbolId: currentParentPath.length ? makeId("symbol", canonicalSymbolName({
         relativePath,
         parentPath: currentParentPath.slice(0, -1),

@@ -7,7 +7,16 @@ import { ensureDir, exists, readText, writeText } from "../utils/fs.js";
 const DEFAULT_SERVER_NAME = "contextforge";
 const MCP_SERVER_PATH = fileURLToPath(new URL("../mcp-server.js", import.meta.url));
 const DEFAULT_PLUGIN_PREFIX = "mcp__plugin_contextforge_contextforge__";
-const MUTATING_TOOL_NAMES = new Set(["forge_write", "forge_edit", "forge_bash"]);
+const MUTATING_TOOL_NAMES = new Set([
+  "forge_batch",
+  "forge_write",
+  "forge_edit",
+  "forge_bash",
+  "forge_rename",
+  "forge_map",
+  "forge_contracts",
+  "forge_wiki"
+]);
 
 export function installClaudeCodeProject(targetDir = process.cwd(), options = {}) {
   const resolvedTarget = path.resolve(targetDir);

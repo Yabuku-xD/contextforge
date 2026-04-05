@@ -45,6 +45,8 @@ export function openDatabase(rootDir) {
   ensureColumn(db, "files", "content_loaded", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "files", "byte_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "files", "line_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "symbols", "start_line", "INTEGER NOT NULL DEFAULT 1");
+  ensureColumn(db, "symbols", "end_line", "INTEGER NOT NULL DEFAULT 1");
   ensureColumn(db, "compression_events", "repo_id", "TEXT");
   ensureColumn(db, "compression_events", "session_id", "TEXT");
   return db;

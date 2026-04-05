@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS symbols (
   language TEXT,
   span_start INTEGER NOT NULL,
   span_end INTEGER NOT NULL,
+  start_line INTEGER NOT NULL DEFAULT 1,
+  end_line INTEGER NOT NULL DEFAULT 1,
   parent_symbol_id TEXT,
   symbol_hash TEXT NOT NULL,
   body TEXT

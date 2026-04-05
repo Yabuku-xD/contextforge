@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -31,6 +32,37 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(tools.tools.some((tool) => tool.name === "forge_edit"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_bash"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_search"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_changes"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_rename"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_map"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_contracts"));
+
+    const resources = await client.listResources();
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/overview"));
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/flows"));
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/schema"));
+
+    const overviewResource = await client.readResource({
+      uri: "contextforge://repo/overview"
+    });
+    assert.match(overviewResource.contents[0].text, /importantFiles|topLevel/i);
+
+    const generatedMapPath = path.join(sampleRepo, ".contextforge", "generated", "map.md");
+    const generatedContractsPath = path.join(sampleRepo, ".contextforge", "generated", "contracts.md");
+    if (fs.existsSync(generatedMapPath)) fs.rmSync(generatedMapPath, { force: true });
+    if (fs.existsSync(generatedContractsPath)) fs.rmSync(generatedContractsPath, { force: true });
+
+    const mapResource = await client.readResource({
+      uri: "contextforge://repo/map"
+    });
+    assert.match(mapResource.contents[0].text, /"persisted":\s*false/);
+    assert.equal(fs.existsSync(generatedMapPath), false);
+
+    const contractsResource = await client.readResource({
+      uri: "contextforge://repo/contracts"
+    });
+    assert.match(contractsResource.contents[0].text, /"persisted":\s*false/);
+    assert.equal(fs.existsSync(generatedContractsPath), false);
 
     const scan = await client.callTool({
       name: "forge_scan",
@@ -130,6 +162,21 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(!lookup.isError);
     assert.match(lookup.content[0].text, /stored research sources|selected source/i);
     assert.match(lookup.content[0].text, /alpha-secret/i);
+
+    const changes = await client.callTool({
+      name: "forge_changes",
+      arguments: {
+        scope: "unstaged"
+      }
+    });
+    assert.ok(!changes.isError);
+
+    const map = await client.callTool({
+      name: "forge_map",
+      arguments: {}
+    });
+    assert.ok(!map.isError);
+    assert.match(map.content[0].text, /generated|path|summary/i);
   } finally {
     await client.close();
     await transport.close();

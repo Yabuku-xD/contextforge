@@ -11,6 +11,7 @@ import { runScoreboard } from "./scoreboard.js";
 import { installClaudeCodeProject } from "./install/claude-code.js";
 import { clearActiveSession, readActiveSession, rememberActiveSession, resolveRuntimeSessionId } from "./session/runtime.js";
 import { startMcpServer } from "./mcp-server.js";
+import { startBridgeServer } from "./server/bridge.js";
 
 async function main(argv) {
   const [command = "doctor", ...rawRest] = argv.slice(2);
@@ -72,6 +73,19 @@ async function main(argv) {
     return;
   }
 
+  if (command === "serve") {
+    const rootDir = path.resolve(rest[0] ?? process.cwd());
+    const bridge = await startBridgeServer(rootDir, {
+      port: flags.port
+    });
+    console.log(JSON.stringify({
+      host: bridge.host,
+      port: bridge.port,
+      url: bridge.url
+    }, null, 2));
+    return;
+  }
+
   if (command === "scoreboard") {
     const rootDir = path.resolve(rest[0] ?? process.cwd());
     console.log(JSON.stringify(await runScoreboard(rootDir), null, 2));
@@ -80,6 +94,40 @@ async function main(argv) {
 
   if (command === "report-status") {
     console.log(JSON.stringify(reportInventory(), null, 2));
+    return;
+  }
+
+  if (["list-repos", "group-create", "group-add", "group-remove", "group-list", "group-query", "group-status"].includes(command)) {
+    const forge = createContextForge(process.cwd());
+    try {
+      switch (command) {
+        case "list-repos":
+          console.log(JSON.stringify(forge.listRepos(), null, 2));
+          break;
+        case "group-create":
+          console.log(JSON.stringify(forge.groupCreate(rest[0] ?? ""), null, 2));
+          break;
+        case "group-add":
+          console.log(JSON.stringify(forge.groupAdd(rest[0] ?? "", rest[1] ?? ""), null, 2));
+          break;
+        case "group-remove":
+          console.log(JSON.stringify(forge.groupRemove(rest[0] ?? "", rest[1] ?? ""), null, 2));
+          break;
+        case "group-list":
+          console.log(JSON.stringify(forge.groupList(rest[0] ?? null), null, 2));
+          break;
+        case "group-query":
+          console.log(JSON.stringify(forge.groupQuery(rest[0] ?? "", rest[1] ?? "", {
+            limit: rest[2]
+          }), null, 2));
+          break;
+        case "group-status":
+          console.log(JSON.stringify(forge.groupStatus(rest[0] ?? ""), null, 2));
+          break;
+      }
+    } finally {
+      forge.close();
+    }
     return;
   }
 
@@ -93,7 +141,15 @@ async function main(argv) {
     return;
   }
 
-  const rootOnlyCommands = new Set(["doctor", "index", "resume", "stats", "purge", "active-session", "clear-active-session"]);
+  const rootOnlyCommands = new Set([
+    "doctor",
+    "index",
+    "resume",
+    "stats",
+    "purge",
+    "active-session",
+    "clear-active-session"
+  ]);
   const query = rootOnlyCommands.has(command) ? "" : rest[0] ?? "";
   const rootDir = path.resolve(rootOnlyCommands.has(command) ? (rest[0] ?? process.cwd()) : (rest[1] ?? process.cwd()));
   if (command === "active-session") {
@@ -150,8 +206,28 @@ async function main(argv) {
       case "impact":
         console.log(JSON.stringify(forge.impact(query), null, 2));
         break;
+      case "changes":
+        console.log(JSON.stringify(forge.changes({
+          scope: query || rest[2],
+          baseRef: rest[2] ?? rest[3]
+        }), null, 2));
+        break;
+      case "rename":
+        console.log(JSON.stringify(forge.rename(query, rest[2] ?? "", {
+          dryRun: rest[3]
+        }), null, 2));
+        break;
       case "why":
         console.log(JSON.stringify(forge.why(query), null, 2));
+        break;
+      case "map":
+        console.log(JSON.stringify(forge.map(query), null, 2));
+        break;
+      case "contracts":
+        console.log(JSON.stringify(forge.contracts(query), null, 2));
+        break;
+      case "wiki":
+        console.log(JSON.stringify(forge.wiki(query), null, 2));
         break;
       case "resume":
         console.log(JSON.stringify(forge.resume(), null, 2));
@@ -246,7 +322,8 @@ function parseCliArgs(args) {
     useActiveSession: false,
     rememberSession: false,
     allowMutations: false,
-    dontAsk: false
+    dontAsk: false,
+    port: null
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -279,6 +356,17 @@ function parseCliArgs(args) {
 
     if (value === "--dont-ask") {
       flags.dontAsk = true;
+      continue;
+    }
+
+    if (value === "--port") {
+      flags.port = args[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+
+    if (value.startsWith("--port=")) {
+      flags.port = value.slice("--port=".length);
       continue;
     }
 

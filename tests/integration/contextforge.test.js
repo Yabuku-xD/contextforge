@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 import { createContextForge } from "../../src/contextforge.js";
 import { recordSessionEvent } from "../../src/session/events.js";
+import { startBridgeServer } from "../../src/server/bridge.js";
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
 const repoRoot = path.resolve(".");
@@ -76,7 +78,10 @@ test("ContextForge can index and understand the repository hosting itself", asyn
       return ![
         ".git",
         ".contextforge",
-        "node_modules"
+        ".tmp-tests",
+        "node_modules",
+        "GitNexus-main",
+        "context-mode"
       ].some((prefix) => relative === prefix || relative.startsWith(`${prefix}${path.sep}`));
     }
   });
@@ -187,6 +192,40 @@ test("ContextForge native file ops handle read write edit directory and bash flo
   }
 });
 
+test("ContextForge exposes graph areas, flows, schema, and generated artifacts", () => {
+  const forge = createContextForge(sampleRepo, { sessionId: `graph_surface_${Date.now()}` });
+  try {
+    const indexSummary = forge.indexRepository();
+    assert.ok(indexSummary.contentCoverage.complete);
+
+    const areas = forge.areas();
+    assert.ok(areas.areaCount >= 1);
+    assert.ok(areas.areas[0].summary.length > 0);
+
+    const flows = forge.flows();
+    assert.ok(flows.flowCount >= 1);
+    assert.ok(flows.flows[0].summary.length > 0);
+
+    const schema = forge.graphSchema();
+    assert.ok(schema.nodeTypes.some((entry) => entry.type === "symbol"));
+    assert.ok(schema.edgeTypes.some((entry) => entry.type === "call"));
+
+    const map = forge.map();
+    assert.ok(fs.existsSync(map.path));
+    assert.match(map.markdown, /ContextForge Repository Map/);
+
+    const contracts = forge.contracts();
+    assert.ok(Array.isArray(contracts.contracts));
+    assert.ok(fs.existsSync(contracts.path));
+
+    const wiki = forge.wiki();
+    assert.ok(fs.existsSync(wiki.path));
+    assert.match(wiki.markdown, /ContextForge Wiki/);
+  } finally {
+    forge.close();
+  }
+});
+
 test("forge_lookup handles code-ish queries and stays scoped to the current session by default", async () => {
   const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-research-scope-"));
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "research-fixture", version: "1.0.0" }, null, 2));
@@ -226,6 +265,74 @@ test("forge_lookup handles code-ish queries and stays scoped to the current sess
     assert.equal(explicitLookup.queries[0].matches.length, 0);
   } finally {
     isolatedForge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("ContextForge can map git changes and apply coordinated renames", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-git-aware-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "git-aware-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "service.js"), "export function createUser(name) {\n  return formatUser(name);\n}\n\nexport function formatUser(name) {\n  return name.trim();\n}\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "handler.js"), "import { createUser } from './service.js';\n\nexport function handleUser(name) {\n  return createUser(name);\n}\n");
+
+  for (const command of [
+    ["git", "init"],
+    ["git", "config", "user.email", "contextforge@example.com"],
+    ["git", "config", "user.name", "ContextForge Tests"],
+    ["git", "add", "."],
+    ["git", "commit", "-m", "init"]
+  ]) {
+    const result = spawnSync(command[0], command.slice(1), {
+      cwd: tempRoot,
+      encoding: "utf8"
+    });
+    assert.equal(result.status, 0, result.stderr);
+  }
+
+  const forge = createContextForge(tempRoot, { sessionId: `git_changes_${Date.now()}` });
+  try {
+    const indexSummary = forge.indexRepository();
+    assert.ok(indexSummary.contentCoverage.complete);
+
+    fs.writeFileSync(path.join(tempRoot, "src", "handler.js"), "import { createUser } from './service.js';\n\nexport function handleUser(name) {\n  return createUser(name).toUpperCase();\n}\n");
+
+    const changes = forge.changes({ scope: "unstaged" });
+    assert.equal(changes.changedFileCount, 1);
+    assert.equal(changes.files[0].path, "src/handler.js");
+    assert.ok(changes.files[0].matchedSymbols.some((symbol) => symbol.displayName === "handleUser"));
+
+    const preview = forge.rename("createUser", "createAccount", { dryRun: true });
+    assert.ok(preview.editCount >= 2);
+    assert.ok(preview.edits.some((edit) => edit.confidence === "graph"));
+
+    const applied = forge.rename("createUser", "createAccount", { dryRun: false });
+    assert.ok(applied.indexSync);
+    assert.match(fs.readFileSync(path.join(tempRoot, "src", "service.js"), "utf8"), /createAccount/);
+    assert.match(fs.readFileSync(path.join(tempRoot, "src", "handler.js"), "utf8"), /createAccount/);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("forge_rename avoids touching unrelated same-name symbols in other files", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-rename-scope-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "rename-scope-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "a.js"), "export function run() { return 1; }\nexport function keep() { return run(); }\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "b.js"), "export function run() { return 2; }\nexport function other() { return run(); }\n");
+
+  const forge = createContextForge(tempRoot, { sessionId: `rename_scope_${Date.now()}` });
+  try {
+    forge.indexRepository();
+
+    const preview = forge.rename("src/a.js::run", "execute", { dryRun: true });
+    assert.equal(preview.editCount, 1);
+    assert.equal(preview.edits[0].path, "src/a.js");
+    assert.ok(preview.skippedFiles.every((entry) => entry.path !== "src/a.js"));
+  } finally {
+    forge.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
@@ -272,6 +379,70 @@ test("forge_start can defer the eager prime on larger repositories", () => {
     } else {
       process.env.CONTEXTFORGE_STARTUP_DEFER_THRESHOLD = previousThreshold;
     }
+  }
+});
+
+test("ContextForge registry, groups, and bridge server work across multiple repos", async () => {
+  const previousTempRegistry = process.env.CONTEXTFORGE_REGISTER_TEMP_REPOS;
+  process.env.CONTEXTFORGE_REGISTER_TEMP_REPOS = "1";
+  const repoA = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-group-a-"));
+  const repoB = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-group-b-"));
+
+  fs.mkdirSync(path.join(repoA, "src"), { recursive: true });
+  fs.mkdirSync(path.join(repoB, "src"), { recursive: true });
+  fs.writeFileSync(path.join(repoA, "package.json"), JSON.stringify({ name: "group-a", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(repoB, "package.json"), JSON.stringify({ name: "group-b", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(repoA, "src", "alpha.js"), "export function alphaCheckout() {\n  return 'checkout';\n}\n");
+  fs.writeFileSync(path.join(repoB, "src", "beta.js"), "export function betaCheckout() {\n  return 'checkout beta';\n}\n");
+
+  const forgeA = createContextForge(repoA, { sessionId: `group_a_${Date.now()}` });
+  const forgeB = createContextForge(repoB, { sessionId: `group_b_${Date.now()}` });
+  const groupName = `integration-group-${Date.now()}`;
+
+  let bridge = null;
+  try {
+    forgeA.indexRepository();
+    forgeB.indexRepository();
+
+    const repos = forgeA.listRepos();
+    assert.ok(repos.repos.some((repo) => repo.name === "group-a"));
+    assert.ok(repos.repos.some((repo) => repo.name === "group-b"));
+    assert.ok(repos.repos.every((repo) => !Object.hasOwn(repo, "rootPath")));
+
+    forgeA.groupCreate(groupName);
+    forgeA.groupAdd(groupName, repoA);
+    forgeA.groupAdd(groupName, repoB);
+
+    const status = forgeA.groupStatus(groupName);
+    assert.equal(status.repos.length, 2);
+    assert.ok(status.repos.every((repo) => repo.contentCoverage.complete));
+
+    const groupQuery = forgeA.groupQuery(groupName, "checkout");
+    assert.equal(groupQuery.results.length, 2);
+    assert.ok(groupQuery.results.some((entry) => entry.matches.length >= 1));
+
+    bridge = await startBridgeServer(repoA, { port: 0 });
+    const health = await fetch(`${bridge.url}/health`).then((response) => response.json());
+    assert.equal(health.ok, true);
+
+    const overview = await fetch(`${bridge.url}/api/overview`).then((response) => response.json());
+    assert.match(overview.summary, /Top-level layout|Important files/i);
+
+    const flows = await fetch(`${bridge.url}/api/flows`).then((response) => response.json());
+    assert.ok(flows.flowCount >= 1);
+  } finally {
+    if (previousTempRegistry == null) {
+      delete process.env.CONTEXTFORGE_REGISTER_TEMP_REPOS;
+    } else {
+      process.env.CONTEXTFORGE_REGISTER_TEMP_REPOS = previousTempRegistry;
+    }
+    if (bridge) {
+      await bridge.close();
+    }
+    forgeA.close();
+    forgeB.close();
+    fs.rmSync(repoA, { recursive: true, force: true });
+    fs.rmSync(repoB, { recursive: true, force: true });
   }
 });
 

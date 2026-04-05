@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isDatabaseLockError, openDatabase } from "./storage/db.js";
 import { loadRepositoryFile, loadRepositoryInventory, loadRepositoryInventoryEntry } from "./indexing/files.js";
@@ -20,6 +20,7 @@ import { hybridSearch, planRaptorStrategy } from "./retrieval/hybrid.js";
 import { exactSymbolSearch } from "./retrieval/exact.js";
 import { resolveAliasSeeds } from "./graph/alias-resolution.js";
 import { buildRepoGraph } from "./graph/repo-graph.js";
+import { buildAreaCatalog, buildFlowCatalog, buildGraphSchemaSummary } from "./graph/catalog.js";
 import { personalizedPageRank } from "./graph/pagerank.js";
 import { recordSessionEvent, listSessionEvents } from "./session/events.js";
 import { buildResumeSummary } from "./session/resume.js";
@@ -43,6 +44,15 @@ import { clearActiveSession } from "./session/runtime.js";
 import { searchResearchSections, storeResearchSource } from "./research/store.js";
 import { ensureDir, exists, readText, relativeTo, writeText } from "./utils/fs.js";
 import { runShellCommand } from "./utils/process.js";
+import {
+  addRepoToGroup,
+  createRepoGroup,
+  listRegisteredRepositories,
+  listRepoGroups,
+  registerIndexedRepository,
+  removeRepoFromGroup,
+  resolveRegisteredRepository
+} from "./storage/registry.js";
 
 const REPO_STATE_CACHE = new Map();
 const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
@@ -96,17 +106,7 @@ export class ContextForge {
       this._filePathById = null;
       this._markRepoSynced();
       this._ensureWatcher();
-      recordSessionEvent(this.db, {
-        repoId: this.repoId,
-        sessionId: this.sessionId,
-        eventType: "index_reuse",
-        payload: {
-          fileCount: inventory.files.length,
-          fingerprint: this.repoFingerprint ?? repoRow?.contentFingerprint ?? null,
-          batchSize
-        }
-      });
-      return {
+      const reusedSummary = {
         ...this._repoCounts(),
         repoId: this.repoId,
         reusedIndex: true,
@@ -117,6 +117,18 @@ export class ContextForge {
         batchSize,
         batchCount: Math.max(1, Math.ceil(inventory.files.length / batchSize))
       };
+      this._registerIndexedRepo(reusedSummary);
+      recordSessionEvent(this.db, {
+        repoId: this.repoId,
+        sessionId: this.sessionId,
+        eventType: "index_reuse",
+        payload: {
+          fileCount: inventory.files.length,
+          fingerprint: this.repoFingerprint ?? repoRow?.contentFingerprint ?? null,
+          batchSize
+        }
+      });
+      return reusedSummary;
     }
 
     return this._indexRepositoryInBatches(inventory.files, {
@@ -409,7 +421,15 @@ export class ContextForge {
       "forge_symbol",
       "forge_scope",
       "forge_impact",
+      "forge_changes",
+      "forge_rename",
       "forge_why",
+      "forge_list_repos",
+      "forge_group_query",
+      "forge_group_status",
+      "forge_map",
+      "forge_contracts",
+      "forge_wiki",
       "forge_session",
       "forge_resume",
       "forge_stats",
@@ -1089,6 +1109,449 @@ export class ContextForge {
     return { compression, retrieval, session, research, pager: this.pageState() };
   }
 
+  areas(query = "") {
+    this.ensureRepositoryIndexed({ reason: "areas" });
+    const state = this._loadRepoState();
+    const overview = this._buildInventoryOverview(query, {
+      fallbackQuery: "repo areas packages directories modules responsibilities"
+    });
+    const areas = buildAreaCatalog({
+      topLevel: overview.topLevel,
+      packages: overview.packages,
+      files: overview.files,
+      symbols: state.symbols,
+      edges: state.edges,
+      entrypoints: overview.entrypoints
+    });
+
+    return {
+      repoId: this.repoId,
+      areaCount: areas.length,
+      indexedMemory: this._buildIndexedMemoryCoverage(),
+      areas,
+      summary: `Derived ${areas.length} repository area${areas.length === 1 ? "" : "s"} from the current index.`
+    };
+  }
+
+  flows(query = "") {
+    this.ensureRepositoryIndexed({ reason: "flows" });
+    const state = this._loadRepoState();
+    const overview = this._buildInventoryOverview(query, {
+      fallbackQuery: "repo flows entrypoints execution paths"
+    });
+    const flows = buildFlowCatalog({
+      files: overview.files,
+      symbols: state.symbols,
+      edges: state.edges,
+      entrypoints: overview.entrypoints
+    });
+
+    return {
+      repoId: this.repoId,
+      flowCount: flows.length,
+      indexedMemory: this._buildIndexedMemoryCoverage(),
+      flows,
+      summary: `Derived ${flows.length} execution flow${flows.length === 1 ? "" : "s"} from repository entrypoints.`
+    };
+  }
+
+  graphSchema() {
+    this.ensureRepositoryIndexed({ reason: "graph_schema" });
+    const state = this._loadRepoState();
+    const overview = this._buildInventoryOverview("", {
+      fallbackQuery: "repo areas packages directories modules responsibilities"
+    });
+    const areas = buildAreaCatalog({
+      topLevel: overview.topLevel,
+      packages: overview.packages,
+      files: overview.files,
+      symbols: state.symbols,
+      edges: state.edges,
+      entrypoints: overview.entrypoints
+    });
+    const flows = buildFlowCatalog({
+      files: overview.files,
+      symbols: state.symbols,
+      edges: state.edges,
+      entrypoints: overview.entrypoints
+    });
+    const schema = buildGraphSchemaSummary({
+      files: state.files,
+      symbols: state.symbols,
+      edges: state.edges,
+      areas,
+      flows
+    });
+
+    return {
+      repoId: this.repoId,
+      ...schema,
+      indexedMemory: this._buildIndexedMemoryCoverage()
+    };
+  }
+
+  changes(options = {}) {
+    this.ensureRepositoryIndexed({ reason: "changes" });
+    const scope = normalizeChangeScope(options.scope);
+    const baseRef = options.baseRef ? String(options.baseRef) : null;
+    const repoChanges = collectGitChanges(this.rootDir, scope, baseRef);
+    const symbols = this._loadSymbols();
+    const state = this._loadRepoState();
+    const symbolIndex = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
+    const results = repoChanges.files.map((file) => {
+      const matchingSymbols = symbols
+        .filter((symbol) => this._relativePathForFile(symbol.fileId) === file.path)
+        .filter((symbol) => !file.changedLines.length || intersectsAnyLineRange(symbol, file.changedLines));
+      const impacted = unique(matchingSymbols.flatMap((symbol) =>
+        computeImpact(symbol.symbolId, state.edges).slice(0, 8)
+      ));
+      const impactedSymbols = impacted
+        .map((symbolId) => symbolIndex.get(symbolId))
+        .filter(Boolean)
+        .slice(0, 8)
+        .map((symbol) => ({
+          symbolId: symbol.symbolId,
+          canonicalName: symbol.canonicalName,
+          displayName: symbol.displayName,
+          filePath: this._relativePathForFile(symbol.fileId)
+        }));
+
+      return {
+        path: file.path,
+        changeType: file.changeType,
+        changedLines: file.changedLines,
+        matchedSymbols: matchingSymbols.map((symbol) => ({
+          symbolId: symbol.symbolId,
+          canonicalName: symbol.canonicalName,
+          displayName: symbol.displayName,
+          startLine: symbol.startLine,
+          endLine: symbol.endLine
+        })),
+        impactedSymbols
+      };
+    });
+
+    return {
+      scope,
+      baseRef,
+      changedFileCount: results.length,
+      files: results,
+      summary: `Detected ${results.length} changed file${results.length === 1 ? "" : "s"} and mapped them to indexed symbols and impact candidates.`
+    };
+  }
+
+  rename(symbolQuery, newName, options = {}) {
+    this.ensureRepositoryIndexed({ reason: "rename" });
+    const normalizedQuery = String(symbolQuery ?? "").trim();
+    const normalizedNewName = String(newName ?? "").trim();
+    if (!normalizedQuery || !normalizedNewName) {
+      throw new Error("forge_rename requires both symbolQuery and newName.");
+    }
+
+    const symbols = this._loadSymbols();
+    const symbolById = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
+    const [seed] = exactSymbolSearch(normalizedQuery, symbols, 1);
+    if (!seed) {
+      throw new Error(`Could not find a symbol matching "${normalizedQuery}".`);
+    }
+
+    const dryRun = coerceBoolean(options.dryRun, true);
+    const wordBoundary = new RegExp(`\\b${escapeRegExp(seed.displayName)}\\b`, "g");
+    const connectedFiles = new Set();
+    for (const edge of this._loadEdges()) {
+      if (edge.fromSymbolId !== seed.symbolId && edge.toSymbolId !== seed.symbolId) {
+        continue;
+      }
+      const relatedId = edge.fromSymbolId === seed.symbolId ? edge.toSymbolId : edge.fromSymbolId;
+      const symbol = symbolById.get(relatedId);
+      if (symbol) {
+        connectedFiles.add(symbol.fileId);
+      }
+    }
+    connectedFiles.add(seed.fileId);
+
+    const conflictingSymbolsByFile = new Map();
+    for (const symbol of symbols) {
+      if (symbol.displayName !== seed.displayName || symbol.symbolId === seed.symbolId) {
+        continue;
+      }
+      if (!conflictingSymbolsByFile.has(symbol.fileId)) {
+        conflictingSymbolsByFile.set(symbol.fileId, []);
+      }
+      conflictingSymbolsByFile.get(symbol.fileId).push(symbol);
+    }
+
+    if ((conflictingSymbolsByFile.get(seed.fileId) ?? []).length) {
+      throw new Error(`Cannot safely rename "${seed.displayName}" because ${this._relativePathForFile(seed.fileId)} contains multiple symbols with that name.`);
+    }
+
+    const edits = [];
+    const changedPaths = [];
+    const skippedFiles = [];
+    for (const file of this._loadIndexedFiles({ includeContent: true })) {
+      if (file.contentKind !== "text" || !file.contentLoaded || !file.content) {
+        continue;
+      }
+      if (!connectedFiles.has(file.fileId)) {
+        continue;
+      }
+      const conflicts = conflictingSymbolsByFile.get(file.fileId) ?? [];
+      if (conflicts.length) {
+        skippedFiles.push({
+          path: file.relativePath,
+          reason: "conflicting_same_name_symbol",
+          conflictingSymbols: conflicts.slice(0, 4).map((symbol) => ({
+            symbolId: symbol.symbolId,
+            canonicalName: symbol.canonicalName,
+            displayName: symbol.displayName
+          }))
+        });
+        continue;
+      }
+      const matches = [...file.content.matchAll(wordBoundary)];
+      if (!matches.length) {
+        continue;
+      }
+      const filePath = file.relativePath;
+      const confidence = file.fileId === seed.fileId || connectedFiles.has(file.fileId) ? "graph" : "text_search";
+      edits.push({
+        path: filePath,
+        replacements: matches.length,
+        confidence,
+        preview: buildExcerptAroundIndex(
+          file.content.replace(wordBoundary, normalizedNewName),
+          matches[0]?.index ?? 0,
+          { contextLines: 1, maxLines: 6 }
+        )
+      });
+
+      if (!dryRun) {
+        const resolved = this._resolveWorkspacePath(filePath);
+        writeText(resolved, file.content.replace(wordBoundary, normalizedNewName));
+        changedPaths.push(filePath);
+      }
+    }
+
+    const indexSync = dryRun || !changedPaths.length
+      ? null
+      : this._syncChangedPaths(changedPaths, { reason: "rename" });
+
+    return {
+      symbol: {
+        symbolId: seed.symbolId,
+        canonicalName: seed.canonicalName,
+        displayName: seed.displayName,
+        filePath: this._relativePathForFile(seed.fileId)
+      },
+      newName: normalizedNewName,
+      dryRun,
+      editCount: edits.length,
+      edits,
+      skippedFiles,
+      indexSync,
+      summary: `${dryRun ? "Planned" : "Applied"} coordinated rename for ${seed.displayName} across ${edits.length} safe file${edits.length === 1 ? "" : "s"}${skippedFiles.length ? ` while skipping ${skippedFiles.length} ambiguous file${skippedFiles.length === 1 ? "" : "s"}` : ""}.`
+    };
+  }
+
+  listRepos() {
+    const repos = listRegisteredRepositories();
+    return {
+      repos: repos.map((repo) => this._publicRegisteredRepo(repo)),
+      summary: `ContextForge knows about ${repos.length} indexed repositor${repos.length === 1 ? "y" : "ies"}.`
+    };
+  }
+
+  groupCreate(name) {
+    const group = createRepoGroup(name);
+    return {
+      group: this._publicRepoGroup(group),
+      summary: `Created or reused repo group ${group.name}.`
+    };
+  }
+
+  groupAdd(name, repoRef) {
+    const group = addRepoToGroup(name, repoRef);
+    return {
+      group: this._publicRepoGroup(group),
+      summary: `Group ${group.name} now tracks ${group.repos.length} repositor${group.repos.length === 1 ? "y" : "ies"}.`
+    };
+  }
+
+  groupRemove(name, repoRef) {
+    const group = removeRepoFromGroup(name, repoRef);
+    return {
+      group: this._publicRepoGroup(group),
+      summary: `Group ${group.name} now tracks ${group.repos.length} repositor${group.repos.length === 1 ? "y" : "ies"}.`
+    };
+  }
+
+  groupList(name = null) {
+    const groups = listRepoGroups(name ?? null);
+    return {
+      groups: Array.isArray(groups)
+        ? groups.map((group) => this._publicRepoGroup(group))
+        : groups
+        ? this._publicRepoGroup(groups)
+        : null,
+      summary: Array.isArray(groups)
+        ? `Found ${groups.length} repo group${groups.length === 1 ? "" : "s"}.`
+        : groups
+        ? `Loaded repo group ${groups.name}.`
+        : `No repo group found for ${name}.`
+    };
+  }
+
+  groupQuery(name, query, options = {}) {
+    const group = listRepoGroups(name);
+    if (!group) {
+      throw new Error(`Unknown repo group: ${name}`);
+    }
+    const limit = clampNumber(options.limit, 1, 10, 4);
+    const results = [];
+
+    for (const repo of group.repos ?? []) {
+      const resolvedRepo = resolveRegisteredRepository(repo.repoId) ?? resolveRegisteredRepository(repo.name);
+      if (!resolvedRepo?.rootPath) {
+        results.push({
+          repo: this._publicRegisteredRepo(repo),
+          matches: [],
+          unavailable: true
+        });
+        continue;
+      }
+      const nested = createContextForge(resolvedRepo.rootPath, { sessionId: this.sessionId });
+      try {
+        const matches = nested.search(query, { limit });
+        results.push({
+          repo: this._publicRegisteredRepo(resolvedRepo),
+          matches
+        });
+      } finally {
+        nested.close();
+      }
+    }
+
+    return {
+      group: group.name,
+      repoCount: (group.repos ?? []).length,
+      query,
+      results,
+      summary: `Searched ${group.name} across ${(group.repos ?? []).length} repositor${(group.repos ?? []).length === 1 ? "y" : "ies"}.`
+    };
+  }
+
+  groupStatus(name) {
+    const group = listRepoGroups(name);
+    if (!group) {
+      throw new Error(`Unknown repo group: ${name}`);
+    }
+
+    const repos = (group.repos ?? []).map((repo) => {
+      const resolvedRepo = resolveRegisteredRepository(repo.repoId) ?? resolveRegisteredRepository(repo.name);
+      if (!resolvedRepo?.rootPath) {
+        return {
+          ...this._publicRegisteredRepo(repo),
+          indexStatus: "unavailable",
+          indexedFileCount: 0,
+          fileCount: 0,
+          contentCoverage: {
+            complete: false,
+            status: "unavailable"
+          }
+        };
+      }
+      const nested = createContextForge(resolvedRepo.rootPath, { sessionId: this.sessionId });
+      try {
+        const row = nested._readRepositoryRow();
+        const counts = nested._repoCounts();
+        return {
+          ...this._publicRegisteredRepo(resolvedRepo),
+          indexStatus: row?.indexStatus ?? "idle",
+          indexedFileCount: row?.indexedFileCount ?? counts.filesIndexed,
+          fileCount: row?.fileCount ?? counts.filesIndexed,
+          contentCoverage: nested._buildIndexedMemoryCoverage(row)
+        };
+      } finally {
+        nested.close();
+      }
+    });
+
+    return {
+      group: group.name,
+      repos,
+      summary: `Loaded status for ${repos.length} repositor${repos.length === 1 ? "y" : "ies"} in ${group.name}.`
+    };
+  }
+
+  map(query = "", options = {}) {
+    const overview = this.scan(query);
+    const areas = this.areas(query);
+    const flows = this.flows(query);
+    const persist = coerceBoolean(options.persist, true);
+    const markdown = this._buildMapArtifact({
+      overview,
+      areas: areas.areas,
+      flows: flows.flows
+    });
+    const artifactPath = persist ? this._persistGeneratedArtifact("map.md", markdown) : null;
+    return {
+      path: artifactPath,
+      persisted: persist,
+      markdown,
+      summary: persist
+        ? `Generated repository map at ${artifactPath}.`
+        : "Rendered repository map without writing a generated artifact."
+    };
+  }
+
+  wiki(query = "", options = {}) {
+    const overview = this.scan(query);
+    const areas = this.areas(query);
+    const flows = this.flows(query);
+    const persist = coerceBoolean(options.persist, true);
+    const contracts = this.contracts(query, { persist: false });
+    const markdown = this._buildWikiArtifact({
+      overview,
+      areas: areas.areas,
+      flows: flows.flows,
+      contracts: contracts.contracts
+    });
+    const artifactPath = persist ? this._persistGeneratedArtifact("wiki.md", markdown) : null;
+    return {
+      path: artifactPath,
+      persisted: persist,
+      markdown,
+      summary: persist
+        ? `Generated repository wiki at ${artifactPath}.`
+        : "Rendered repository wiki without writing a generated artifact."
+    };
+  }
+
+  contracts(query = "", options = {}) {
+    this.ensureRepositoryIndexed({ reason: "contracts" });
+    const state = this._loadRepoState();
+    const overview = this._buildInventoryOverview(query, {
+      fallbackQuery: "integration contracts package boundaries imports calls"
+    });
+    const persist = coerceBoolean(options.persist, true);
+    const contracts = summarizeContracts({
+      files: overview.files,
+      symbols: state.symbols,
+      edges: state.edges
+    });
+    const markdown = this._buildContractsArtifact(contracts);
+    const artifactPath = persist ? this._persistGeneratedArtifact("contracts.md", markdown) : null;
+    return {
+      path: artifactPath,
+      contracts,
+      persisted: persist,
+      markdown,
+      summary: persist
+        ? `Generated ${contracts.length} cross-area contract${contracts.length === 1 ? "" : "s"} at ${artifactPath}.`
+        : `Rendered ${contracts.length} cross-area contract${contracts.length === 1 ? "" : "s"} without writing a generated artifact.`
+    };
+  }
+
   _clearRepoData() {
     const db = this.db;
     for (const table of ["files", "symbols", "symbol_edges", "chunks", "vectors", "raptor_nodes"]) {
@@ -1146,7 +1609,8 @@ export class ContextForge {
   _loadSymbols() {
     return this.db.prepare(`
       SELECT symbol_id AS symbolId, file_id AS fileId, canonical_name AS canonicalName, display_name AS displayName,
-             kind, language, span_start AS spanStart, span_end AS spanEnd, parent_symbol_id AS parentSymbolId, symbol_hash AS symbolHash, body
+             kind, language, span_start AS spanStart, span_end AS spanEnd, start_line AS startLine, end_line AS endLine,
+             parent_symbol_id AS parentSymbolId, symbol_hash AS symbolHash, body
       FROM symbols WHERE repo_id = ?
     `).all(this.repoId);
   }
@@ -1293,8 +1757,8 @@ export class ContextForge {
       VALUES (@fileId, @repoId, @filePath, @fileHash, @content, @contentKind, @contentLoaded, @byteCount, @lineCount, @language, @parseStatus, @parseError, @updatedAt)
     `);
     const insertSymbol = this.db.prepare(`
-      INSERT OR REPLACE INTO symbols (symbol_id, repo_id, file_id, canonical_name, display_name, kind, language, span_start, span_end, parent_symbol_id, symbol_hash, body)
-      VALUES (@symbolId, @repoId, @fileId, @canonicalName, @displayName, @kind, @language, @spanStart, @spanEnd, @parentSymbolId, @symbolHash, @body)
+      INSERT OR REPLACE INTO symbols (symbol_id, repo_id, file_id, canonical_name, display_name, kind, language, span_start, span_end, start_line, end_line, parent_symbol_id, symbol_hash, body)
+      VALUES (@symbolId, @repoId, @fileId, @canonicalName, @displayName, @kind, @language, @spanStart, @spanEnd, @startLine, @endLine, @parentSymbolId, @symbolHash, @body)
     `);
     const insertChunk = this.db.prepare(`
       INSERT OR REPLACE INTO chunks (chunk_id, repo_id, file_id, chunk_type, label, text, summary, span_start, span_end, chunk_hash, invalidation_state)
@@ -1354,6 +1818,14 @@ export class ContextForge {
       ...extractDataFlowEdges({ repoId: this.repoId, symbols })
     ];
     const raptorNodes = buildRaptorTree({ repoId: this.repoId, files, symbols });
+    const structuralGraph = buildRepoGraph({
+      repoId: this.repoId,
+      files,
+      symbols,
+      pdgEdges,
+      raptorNodes
+    });
+    const allEdges = structuralGraph.edges;
     const repoFingerprint = this._computeRepoFingerprint(files);
     const memoryMetrics = this._buildIndexedMemoryCoverage();
 
@@ -1364,7 +1836,7 @@ export class ContextForge {
       INSERT OR REPLACE INTO symbol_edges (edge_id, repo_id, from_symbol_id, to_symbol_id, edge_type, confidence, provenance_source)
       VALUES (@edgeId, @repoId, @fromSymbolId, @toSymbolId, @edgeType, @confidence, @provenanceSource)
     `);
-    for (const edge of pdgEdges) {
+    for (const edge of allEdges) {
       insertEdge.run(edge);
     }
 
@@ -1395,16 +1867,18 @@ export class ContextForge {
       lastIndexCompletedAt: completedAt
     });
     const contentCoverage = this._buildIndexedMemoryCoverage();
-
-    return {
+    const summary = {
       repoFingerprint,
       filesIndexed: files.length,
       symbolsIndexed: symbols.length,
       chunksIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count,
-      edgesIndexed: pdgEdges.length,
+      edgesIndexed: allEdges.length,
       raptorNodesIndexed: raptorNodes.length,
       contentCoverage
     };
+    this._registerIndexedRepo(summary);
+
+    return summary;
   }
 
   _buildWhySeeds(state, query) {
@@ -1933,7 +2407,8 @@ export class ContextForge {
     }
 
     const counts = this._repoCounts();
-    return counts.filesIndexed === fileCount && counts.symbolsIndexed > 0 && counts.chunksIndexed > 0;
+    const coverage = this._buildIndexedMemoryCoverage(row);
+    return counts.filesIndexed === fileCount && counts.symbolsIndexed > 0 && counts.chunksIndexed > 0 && coverage.complete;
   }
 
   _indexRepositoryInBatches(inventoryFiles, { quickRepoStamp, batchSize }) {
@@ -2079,6 +2554,54 @@ export class ContextForge {
       chunksIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM chunks WHERE repo_id = ?`).get(this.repoId).count,
       edgesIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM symbol_edges WHERE repo_id = ?`).get(this.repoId).count,
       raptorNodesIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM raptor_nodes WHERE repo_id = ?`).get(this.repoId).count
+    };
+  }
+
+  _repoDisplayName() {
+    const packageInfo = this._readPackageInfo();
+    return packageInfo?.name ?? path.basename(this.rootDir);
+  }
+
+  _registerIndexedRepo(summary = {}) {
+    try {
+      registerIndexedRepository({
+        name: this._repoDisplayName(),
+        rootPath: this.rootDir,
+        repoId: this.repoId,
+        fileCount: summary.filesIndexed ?? this._repoCounts().filesIndexed,
+        symbolCount: summary.symbolsIndexed ?? this._repoCounts().symbolsIndexed,
+        edgeCount: summary.edgesIndexed ?? this._repoCounts().edgesIndexed,
+        raptorNodeCount: summary.raptorNodesIndexed ?? this._repoCounts().raptorNodesIndexed,
+        indexStatus: summary.indexStatus ?? "ready",
+        indexedAt: Date.now()
+      });
+    } catch {
+      // Registry failures should never block normal repository work.
+    }
+  }
+
+  _publicRegisteredRepo(repo = {}) {
+    return {
+      name: repo.name,
+      repoId: repo.repoId,
+      fileCount: Number(repo.fileCount ?? 0),
+      symbolCount: Number(repo.symbolCount ?? 0),
+      edgeCount: Number(repo.edgeCount ?? 0),
+      raptorNodeCount: Number(repo.raptorNodeCount ?? 0),
+      indexStatus: repo.indexStatus ?? "ready",
+      indexedAt: repo.indexedAt ?? null
+    };
+  }
+
+  _publicRepoGroup(group = null) {
+    if (!group) {
+      return null;
+    }
+    return {
+      name: group.name,
+      repos: (group.repos ?? []).map((repo) => this._publicRegisteredRepo(repo)),
+      createdAt: group.createdAt ?? null,
+      updatedAt: group.updatedAt ?? null
     };
   }
 
@@ -2948,6 +3471,57 @@ export class ContextForge {
     };
   }
 
+  _persistGeneratedArtifact(fileName, content) {
+    const generatedDir = path.join(this.rootDir, ".contextforge", "generated");
+    ensureDir(generatedDir);
+    const artifactPath = path.join(generatedDir, fileName);
+    writeText(artifactPath, String(content ?? ""));
+    return artifactPath;
+  }
+
+  _buildMapArtifact({ overview, areas, flows }) {
+    return [
+      `# ContextForge Repository Map`,
+      ``,
+      `## Overview`,
+      `- Package: ${overview.packageInfo?.name ?? path.basename(this.rootDir)}${overview.packageInfo?.version ? `@${overview.packageInfo.version}` : ""}`,
+      `- Top-level areas: ${overview.topLevel.map((item) => `${item.path} (${item.fileCount})`).join(", ")}`,
+      `- Key entrypoints: ${overview.entrypoints.slice(0, 6).map((item) => item.path).join(", ") || "none"}`,
+      ``,
+      `## Areas`,
+      ...areas.slice(0, 12).map((area) => `- ${area.label}: ${area.summary}`),
+      ``,
+      `## Flows`,
+      ...flows.slice(0, 10).map((flow) => `- ${flow.label}: ${flow.summary}`)
+    ].join("\n");
+  }
+
+  _buildWikiArtifact({ overview, areas, flows, contracts }) {
+    return [
+      `# ContextForge Wiki`,
+      ``,
+      `## Repository`,
+      overview.summary,
+      ``,
+      `## Major Areas`,
+      ...areas.slice(0, 12).map((area) => `### ${area.label}\n${area.summary}`),
+      ``,
+      `## Execution Flows`,
+      ...flows.slice(0, 10).map((flow) => `### ${flow.label}\n${flow.summary}`),
+      ``,
+      `## Contracts`,
+      ...contracts.slice(0, 12).map((contract) => `- ${contract.from} -> ${contract.to}: ${contract.summary}`)
+    ].join("\n\n");
+  }
+
+  _buildContractsArtifact(contracts) {
+    return [
+      `# ContextForge Contracts`,
+      ``,
+      ...contracts.map((contract) => `- ${contract.from} -> ${contract.to}: ${contract.summary}`)
+    ].join("\n");
+  }
+
   _shouldUseInventoryWalk(query) {
     const lowered = String(query ?? "").toLowerCase();
     return /\b(every single file|every file|all files|all folders|all directories|every folder|every directory|subfolder|subfolders|drill into each package|comprehensive understanding|comprehensive repo|go through every|walk the repo|walk through the repo|walk the project|whole monorepo|entire monorepo)\b/.test(lowered);
@@ -3465,6 +4039,185 @@ function buildCommandSummary({ command, cwd, exitCode, timedOut, stdout, stderr 
   const location = cwd === "." ? "repository root" : cwd;
 
   return `Ran "${command}" in ${location}. Command ${status}. stdout lines: ${stdoutLines}. stderr lines: ${stderrLines}.`;
+}
+
+function normalizeChangeScope(scope) {
+  const normalized = String(scope ?? "unstaged").trim().toLowerCase();
+  return ["unstaged", "staged", "all", "compare"].includes(normalized) ? normalized : "unstaged";
+}
+
+function collectGitChanges(rootDir, scope, baseRef) {
+  const commands = [];
+  if (scope === "staged") {
+    commands.push(["diff", "--cached", "--name-status", "--unified=0"]);
+  } else if (scope === "all") {
+    commands.push(["diff", "--name-status", "--unified=0"]);
+    commands.push(["diff", "--cached", "--name-status", "--unified=0"]);
+  } else if (scope === "compare") {
+    commands.push(["diff", "--name-status", "--unified=0", `${baseRef ?? "HEAD~1"}...HEAD`]);
+  } else {
+    commands.push(["diff", "--name-status", "--unified=0"]);
+  }
+
+  const fileMap = new Map();
+
+  for (const args of commands) {
+    const nameStatus = spawnSync("git", args, {
+      cwd: rootDir,
+      encoding: "utf8"
+    });
+    if (nameStatus.status !== 0) {
+      continue;
+    }
+
+    const lines = normalizeFileLines(nameStatus.stdout).filter(Boolean);
+    for (const line of lines) {
+      const [status, ...rest] = line.split(/\s+/);
+      const filePath = rest.pop();
+      if (!filePath) {
+        continue;
+      }
+
+      const diffArgs = [...args.slice(0, -1), "--", filePath];
+      if (scope === "compare") {
+        diffArgs.unshift(...["diff", "--unified=0", `${baseRef ?? "HEAD~1"}...HEAD`]);
+      }
+      const patchArgs = scope === "compare"
+        ? ["diff", "--unified=0", `${baseRef ?? "HEAD~1"}...HEAD`, "--", filePath]
+        : status === "A" && args.includes("--cached")
+          ? ["diff", "--cached", "--unified=0", "--", filePath]
+          : args.includes("--cached")
+            ? ["diff", "--cached", "--unified=0", "--", filePath]
+            : ["diff", "--unified=0", "--", filePath];
+      const patch = spawnSync("git", patchArgs, {
+        cwd: rootDir,
+        encoding: "utf8"
+      });
+      const existing = fileMap.get(filePath) ?? {
+        path: filePath,
+        changeType: status,
+        changedLines: []
+      };
+      existing.changeType = status;
+      existing.changedLines.push(...parseChangedLineRanges(patch.stdout));
+      fileMap.set(filePath, existing);
+    }
+  }
+
+  return {
+    scope,
+    files: [...fileMap.values()].map((file) => ({
+      ...file,
+      changedLines: mergeLineRanges(file.changedLines)
+    }))
+  };
+}
+
+function parseChangedLineRanges(diffText) {
+  const ranges = [];
+  for (const line of normalizeFileLines(diffText)) {
+    const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+    if (!match) {
+      continue;
+    }
+    const start = Number.parseInt(match[1], 10);
+    const count = Number.parseInt(match[2] ?? "1", 10);
+    const end = Math.max(start, start + Math.max(count, 1) - 1);
+    ranges.push({ start, end });
+  }
+  return ranges;
+}
+
+function mergeLineRanges(ranges) {
+  const sorted = [...ranges]
+    .filter((range) => Number.isFinite(range.start) && Number.isFinite(range.end))
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  const merged = [];
+
+  for (const range of sorted) {
+    const previous = merged[merged.length - 1];
+    if (!previous || range.start > previous.end + 1) {
+      merged.push({ ...range });
+      continue;
+    }
+    previous.end = Math.max(previous.end, range.end);
+  }
+
+  return merged;
+}
+
+function intersectsAnyLineRange(symbol, ranges) {
+  return ranges.some((range) => symbol.startLine <= range.end && symbol.endLine >= range.start);
+}
+
+function summarizeContracts({ files, symbols, edges }) {
+  const fileById = new Map(files.map((file) => [file.fileId, file]));
+  const symbolById = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
+  const contracts = new Map();
+
+  for (const edge of edges) {
+    if (!["call", "import", "data", "control"].includes(edge.edgeType)) {
+      continue;
+    }
+    const fromSymbol = symbolById.get(edge.fromSymbolId);
+    const toSymbol = symbolById.get(edge.toSymbolId);
+    if (!fromSymbol || !toSymbol) {
+      continue;
+    }
+
+    const fromFile = fileById.get(fromSymbol.fileId);
+    const toFile = fileById.get(toSymbol.fileId);
+    if (!fromFile || !toFile) {
+      continue;
+    }
+
+    const fromArea = topLevelAreaForPath(fromFile.relativePath);
+    const toArea = topLevelAreaForPath(toFile.relativePath);
+    if (!fromArea || !toArea || fromArea === toArea) {
+      continue;
+    }
+
+    const key = `${fromArea}->${toArea}`;
+    if (!contracts.has(key)) {
+      contracts.set(key, {
+        from: fromArea,
+        to: toArea,
+        edgeTypes: new Set(),
+        files: new Set(),
+        symbols: new Set()
+      });
+    }
+
+    const contract = contracts.get(key);
+    contract.edgeTypes.add(edge.edgeType);
+    contract.files.add(fromFile.relativePath);
+    contract.files.add(toFile.relativePath);
+    contract.symbols.add(fromSymbol.displayName);
+    contract.symbols.add(toSymbol.displayName);
+  }
+
+  return [...contracts.values()]
+    .map((contract) => ({
+      from: contract.from,
+      to: contract.to,
+      edgeTypes: [...contract.edgeTypes].sort(),
+      fileCount: contract.files.size,
+      symbolCount: contract.symbols.size,
+      summary: `${contract.from} depends on ${contract.to} through ${[...contract.edgeTypes].sort().join(", ")} edges touching ${contract.files.size} files.`
+    }))
+    .sort((left, right) => right.fileCount - left.fileCount || left.from.localeCompare(right.from) || left.to.localeCompare(right.to));
+}
+
+function topLevelAreaForPath(relativePath) {
+  const normalized = String(relativePath ?? "");
+  if (!normalized.includes("/")) {
+    return "root";
+  }
+  return normalized.split("/")[0];
+}
+
+function escapeRegExp(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function inspectRepositoryFile(file) {

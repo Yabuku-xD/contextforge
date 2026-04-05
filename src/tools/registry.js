@@ -13,7 +13,15 @@ import { forgeSearchTool } from "./forge_search.js";
 import { forgeSymbolTool } from "./forge_symbol.js";
 import { forgeScopeTool } from "./forge_scope.js";
 import { forgeImpactTool } from "./forge_impact.js";
+import { forgeChangesTool } from "./forge_changes.js";
+import { forgeRenameTool } from "./forge_rename.js";
 import { forgeWhyTool } from "./forge_why.js";
+import { forgeListReposTool } from "./forge_list_repos.js";
+import { forgeGroupQueryTool } from "./forge_group_query.js";
+import { forgeGroupStatusTool } from "./forge_group_status.js";
+import { forgeMapTool } from "./forge_map.js";
+import { forgeContractsTool } from "./forge_contracts.js";
+import { forgeWikiTool } from "./forge_wiki.js";
 import { forgeSessionTool } from "./forge_session.js";
 import { forgeResumeTool } from "./forge_resume.js";
 import { forgeStatsTool } from "./forge_stats.js";
@@ -35,7 +43,15 @@ export const TOOL_REGISTRY = {
   forge_symbol: forgeSymbolTool,
   forge_scope: forgeScopeTool,
   forge_impact: forgeImpactTool,
+  forge_changes: forgeChangesTool,
+  forge_rename: forgeRenameTool,
   forge_why: forgeWhyTool,
+  forge_list_repos: forgeListReposTool,
+  forge_group_query: forgeGroupQueryTool,
+  forge_group_status: forgeGroupStatusTool,
+  forge_map: forgeMapTool,
+  forge_contracts: forgeContractsTool,
+  forge_wiki: forgeWikiTool,
   forge_session: forgeSessionTool,
   forge_resume: forgeResumeTool,
   forge_stats: forgeStatsTool,
