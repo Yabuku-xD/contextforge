@@ -113,10 +113,11 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(walk.audit.answerIfAskedWhetherWholeProjectWasRead.includes("Yes."));
     assert.ok(walk.audit.answerIfAskedWhetherEveryCornerWasRead.includes("Yes."));
     assert.match(walk.guidance, /exhaustive repository digest/i);
-    assert.match(walk.guidance, /Do not manually read additional files/i);
+    assert.match(walk.guidance, /Stop tool use for the initial response/i);
+    assert.match(walk.guidance, /Do not call forge_read, forge_batch, forge_lookup, forge_search/i);
     assert.match(walk.summary, /opened all .* repository files locally/i);
     assert.doesNotMatch(walk.summary, /Start with these representative files/i);
-    assert.match(walk.summary, /do not open them unless the user explicitly asks/i);
+    assert.match(walk.summary, /do not open them or call additional tools unless the user explicitly asks/i);
 
     const routed = forge.understand("Go through every single file, folder, and subfolder in this project.");
     assert.equal(routed.mode, "exhaustive_walk");

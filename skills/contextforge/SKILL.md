@@ -28,5 +28,5 @@ Use ContextForge as the first stop for repository context work.
    - causality or repo/session reasoning: `forge_why`
    - continuity: `forge_resume`
    - health or diagnostics: `forge_stats` or `forge_doctor`
-4. Answer from the ContextForge result first. Do not jump to heavier built-in tool paths unless the user explicitly asks for them or the ContextForge result is clearly insufficient.
+4. Answer from the ContextForge result first. If the routed tool is `forge_walk` and it returns `exhaustive_walk`, stop tool use for the initial answer and answer from that audit alone. Do not call `forge_read`, `forge_batch`, `forge_lookup`, built-in reads, or any other follow-up tools unless the user explicitly asks for drilldown or the audit says coverage is incomplete.
 5. If the request is an edit request, use `forge_search`, `forge_read`, `forge_edit`, `forge_write`, and `forge_impact` before considering fallback tools.

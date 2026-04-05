@@ -67,6 +67,8 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
   assert.match(payload.hookSpecificOutput.additionalContext, /did you read the whole project/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /every corner of the files/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /keep the first whole-repo answer compact/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /stop tool use for the initial answer/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /Do not call forge_read, forge_batch, forge_lookup, forge_search/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /ContextForge/);
 });
 

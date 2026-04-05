@@ -23,4 +23,4 @@ Use ContextForge's deeper repo map for exhaustive repository prompts.
    - the major areas
    - the key entrypoints and important files
 5. Keep the first answer receipt-first and compact. Avoid long tables unless the user explicitly asks for them.
-6. If `forge_walk` returns `exhaustive_walk`, answer from that audit alone for the initial response. Do not manually inspect additional files, representative files, or package entrypoints unless the user explicitly asks for a deeper drilldown or ContextForge reports incomplete coverage.
+6. If `forge_walk` returns `exhaustive_walk`, stop there for the initial response. Do not call `forge_read`, `forge_batch`, `forge_lookup`, `forge_search`, built-in reads, or any other follow-up tools unless the user explicitly asks for a deeper drilldown or ContextForge reports incomplete coverage.
