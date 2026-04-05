@@ -133,6 +133,8 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.match(walk.content[0].text, /initialAnswerReady/);
     assert.match(walk.content[0].text, /forbidFollowupTools/);
     assert.match(walk.content[0].text, /forge_batch/);
+    assert.match(walk.content[0].text, /contextSavings/);
+    assert.match(walk.content[0].text, /savedBytes/);
 
     const read = await client.callTool({
       name: "forge_read",
@@ -164,6 +166,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(!batch.isError);
     assert.match(batch.content[0].text, /indexedSections/);
     assert.match(batch.content[0].text, /receipt_first/);
+    assert.match(batch.content[0].text, /contextSavings/);
 
     const batchPayload = batch.structuredContent;
     const lookup = await client.callTool({
@@ -176,6 +179,15 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(!lookup.isError);
     assert.match(lookup.content[0].text, /stored research sources|selected source/i);
     assert.match(lookup.content[0].text, /alpha-secret/i);
+    assert.match(lookup.content[0].text, /contextSavings/);
+
+    const stats = await client.callTool({
+      name: "forge_stats",
+      arguments: {}
+    });
+    assert.ok(!stats.isError);
+    assert.match(stats.content[0].text, /deliverySavings/);
+    assert.match(stats.content[0].text, /savedTokens/);
 
     const changes = await client.callTool({
       name: "forge_changes",

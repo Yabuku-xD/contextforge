@@ -190,6 +190,21 @@ test("ContextForge native file ops handle read write edit directory and bash flo
     assert.equal(lookup.queries.length, 1);
     assert.match(lookup.queries[0].matches[0]?.preview ?? "", /checkout timeout/i);
     assert.ok(forge.stats().research.sources >= 1);
+    const receiptOne = forge.recordToolReceipt({
+      toolName: "forge_batch",
+      rawSize: 10_000,
+      deliveredSize: 800
+    });
+    assert.ok(receiptOne.savedSize > 0);
+    forge.recordToolReceipt({
+      toolName: "forge_walk",
+      rawSize: 32_000,
+      deliveredSize: 1_400
+    });
+    assert.ok(forge.stats().deliverySavings.count >= 2);
+    assert.ok(forge.stats().deliverySavings.saved > 0);
+    assert.ok(forge.stats().deliverySavings.savedTokens > 0);
+    assert.ok(forge.stats().deliverySavings.reductionPct > 0);
   } finally {
     forge.close();
     fs.rmSync(tempRoot, { recursive: true, force: true });

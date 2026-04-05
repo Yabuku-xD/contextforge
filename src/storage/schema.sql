@@ -147,6 +147,20 @@ CREATE TABLE IF NOT EXISTS compression_events (
   created_at INTEGER DEFAULT (unixepoch())
 );
 
+CREATE TABLE IF NOT EXISTS tool_receipts (
+  receipt_id TEXT PRIMARY KEY,
+  repo_id TEXT,
+  session_id TEXT,
+  tool_name TEXT NOT NULL,
+  raw_size INTEGER NOT NULL,
+  delivered_size INTEGER NOT NULL,
+  saved_size INTEGER NOT NULL,
+  raw_token_estimate INTEGER NOT NULL DEFAULT 0,
+  delivered_token_estimate INTEGER NOT NULL DEFAULT 0,
+  saved_token_estimate INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER DEFAULT (unixepoch())
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
   chunk_id UNINDEXED,
   label,

@@ -48,7 +48,7 @@ export async function startMcpServer(argv = process.argv.slice(2)) {
       inputSchema: buildToolSchema(tool.parameters)
     }, async (args = {}) => {
       const result = await tool.execute(forge, args);
-      const payload = formatToolResult(tool.name, result);
+      const payload = formatToolResult(forge, tool.name, result);
       return {
         content: [{
           type: "text",
@@ -203,13 +203,94 @@ function normalizeStructuredContent(result) {
   return { result };
 }
 
-function formatToolResult(toolName, result) {
+function formatToolResult(forge, toolName, result) {
   const normalized = normalizeStructuredContent(result);
   const compact = compactToolResult(toolName, normalized);
+  const rawSerialized = JSON.stringify(normalized);
+  const payloadWithSavings = attachContextSavings(compact, rawSerialized);
+  const text = JSON.stringify(payloadWithSavings);
+  forge.recordToolReceipt?.({
+    toolName,
+    rawSize: Buffer.byteLength(rawSerialized, "utf8"),
+    deliveredSize: Buffer.byteLength(text, "utf8")
+  });
   return {
-    text: JSON.stringify(compact),
-    structured: compact
+    text,
+    structured: payloadWithSavings
   };
+}
+
+function attachContextSavings(payload, rawSerialized) {
+  const basePayload = payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload
+    : { result: payload };
+  let provisional = {
+    ...basePayload,
+    contextSavings: {
+      rawBytes: 0,
+      deliveredBytes: 0,
+      savedBytes: 0,
+      reductionPct: 0,
+      rawTokens: 0,
+      deliveredTokens: 0,
+      savedTokens: 0,
+      display: "0 B -> 0 B"
+    }
+  };
+  let deliveredSerialized = JSON.stringify(provisional);
+  provisional = {
+    ...basePayload,
+    contextSavings: buildContextSavings(rawSerialized, deliveredSerialized)
+  };
+  deliveredSerialized = JSON.stringify(provisional);
+  return {
+    ...basePayload,
+    contextSavings: buildContextSavings(rawSerialized, deliveredSerialized)
+  };
+}
+
+function buildContextSavings(rawSerialized, deliveredSerialized) {
+  const rawBytes = Buffer.byteLength(String(rawSerialized ?? ""), "utf8");
+  const deliveredBytes = Buffer.byteLength(String(deliveredSerialized ?? ""), "utf8");
+  const savedBytes = Math.max(0, rawBytes - deliveredBytes);
+  const rawTokens = estimateTokens(rawBytes);
+  const deliveredTokens = estimateTokens(deliveredBytes);
+  const savedTokens = Math.max(0, rawTokens - deliveredTokens);
+  const reductionPct = rawBytes > 0
+    ? Number(((savedBytes / rawBytes) * 100).toFixed(1))
+    : 0;
+
+  return {
+    rawBytes,
+    deliveredBytes,
+    savedBytes,
+    reductionPct,
+    rawTokens,
+    deliveredTokens,
+    savedTokens,
+    display: `${formatBytes(rawBytes)} -> ${formatBytes(deliveredBytes)} (${reductionPct}% saved)`
+  };
+}
+
+function estimateTokens(byteCount) {
+  return Math.max(0, Math.ceil((Number(byteCount) || 0) / 4));
+}
+
+function formatBytes(byteCount) {
+  const value = Number(byteCount) || 0;
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  const kib = value / 1024;
+  if (kib < 1024) {
+    return `${stripTrailingZeros(kib.toFixed(kib >= 100 ? 0 : kib >= 10 ? 1 : 2))} KB`;
+  }
+  const mib = kib / 1024;
+  return `${stripTrailingZeros(mib.toFixed(mib >= 100 ? 0 : mib >= 10 ? 1 : 2))} MB`;
+}
+
+function stripTrailingZeros(value) {
+  return String(value).replace(/\.0+$|(\.\d*[1-9])0+$/u, "$1");
 }
 
 function compactToolResult(toolName, result) {

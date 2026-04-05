@@ -1023,6 +1023,7 @@ export class ContextForge {
   purge({ maxAgeMs, includePages = true } = {}) {
     purgeOldSessionEvents(this.db, maxAgeMs);
     this.db.prepare(`DELETE FROM compression_events WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
+    this.db.prepare(`DELETE FROM tool_receipts WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
     const sourceIds = this.db.prepare(`
       SELECT source_id AS sourceId
       FROM research_sources
@@ -1082,6 +1083,18 @@ export class ContextForge {
       FROM compression_events
       WHERE repo_id = ? AND session_id = ?
     `).get(this.repoId, this.sessionId);
+    const deliverySavings = this.db.prepare(`
+      SELECT
+        COUNT(*) AS count,
+        COALESCE(SUM(raw_size), 0) AS raw,
+        COALESCE(SUM(delivered_size), 0) AS delivered,
+        COALESCE(SUM(saved_size), 0) AS saved,
+        COALESCE(SUM(raw_token_estimate), 0) AS rawTokens,
+        COALESCE(SUM(delivered_token_estimate), 0) AS deliveredTokens,
+        COALESCE(SUM(saved_token_estimate), 0) AS savedTokens
+      FROM tool_receipts
+      WHERE repo_id = ? AND session_id = ?
+    `).get(this.repoId, this.sessionId);
     const counts = this._repoCounts();
     const watcherAvailable = this._ensureWatcher();
     const retrieval = {
@@ -1106,7 +1119,74 @@ export class ContextForge {
           AND source_id IN (SELECT source_id FROM research_sources WHERE repo_id = ? AND session_id = ?)
       `).get(this.repoId, this.repoId, this.sessionId).count
     };
-    return { compression, retrieval, session, research, pager: this.pageState() };
+    return {
+      compression,
+      deliverySavings: {
+        ...deliverySavings,
+        reductionPct: deliverySavings.raw > 0
+          ? Number((((deliverySavings.saved ?? 0) / deliverySavings.raw) * 100).toFixed(1))
+          : 0
+      },
+      retrieval,
+      session,
+      research,
+      pager: this.pageState()
+    };
+  }
+
+  recordToolReceipt({ toolName, rawSize, deliveredSize }) {
+    const normalizedRaw = Math.max(0, Math.trunc(Number(rawSize) || 0));
+    const normalizedDelivered = Math.max(0, Math.trunc(Number(deliveredSize) || 0));
+    const savedSize = Math.max(0, normalizedRaw - normalizedDelivered);
+    const rawTokenEstimate = estimateTokensFromBytes(normalizedRaw);
+    const deliveredTokenEstimate = estimateTokensFromBytes(normalizedDelivered);
+    const savedTokenEstimate = Math.max(0, rawTokenEstimate - deliveredTokenEstimate);
+
+    try {
+      this.db.prepare(`
+        INSERT OR REPLACE INTO tool_receipts (
+          receipt_id,
+          repo_id,
+          session_id,
+          tool_name,
+          raw_size,
+          delivered_size,
+          saved_size,
+          raw_token_estimate,
+          delivered_token_estimate,
+          saved_token_estimate,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        makeId("receipt", `${this.sessionId}:${toolName}:${Date.now()}:${randomUUID()}`),
+        this.repoId,
+        this.sessionId,
+        String(toolName ?? "unknown"),
+        normalizedRaw,
+        normalizedDelivered,
+        savedSize,
+        rawTokenEstimate,
+        deliveredTokenEstimate,
+        savedTokenEstimate,
+        Date.now()
+      );
+    } catch (error) {
+      if (isDatabaseLockError(error)) {
+        return null;
+      }
+      throw error;
+    }
+
+    return {
+      toolName: String(toolName ?? "unknown"),
+      rawSize: normalizedRaw,
+      deliveredSize: normalizedDelivered,
+      savedSize,
+      rawTokenEstimate,
+      deliveredTokenEstimate,
+      savedTokenEstimate
+    };
   }
 
   areas(query = "") {
@@ -3946,6 +4026,10 @@ function compactCommandOutput(text, maxChars = 4000) {
   const headChars = Math.max(400, Math.floor(maxChars * 0.65));
   const tailChars = Math.max(200, maxChars - headChars - 64);
   return `${normalized.slice(0, headChars)}\n... [output truncated] ...\n${normalized.slice(-tailChars)}`;
+}
+
+function estimateTokensFromBytes(byteCount) {
+  return Math.max(0, Math.ceil((Number(byteCount) || 0) / 4));
 }
 
 function createOutputCollector({ previewChars = 360, sectionChars = 4000 } = {}) {

@@ -34,10 +34,17 @@ test("purge clears session scoped compression stats", async () => {
     await forge.processArtifact("2026-01-01 INFO retry scheduled\n2026-01-01 INFO retry scheduled", {
       filePath: "checkout.log"
     });
+    forge.recordToolReceipt({
+      toolName: "forge_walk",
+      rawSize: 20_000,
+      deliveredSize: 1_000
+    });
 
     assert.equal(forge.stats().compression.count, 1);
+    assert.equal(forge.stats().deliverySavings.count, 1);
     forge.purge();
     assert.equal(forge.stats().compression.count, 0);
+    assert.equal(forge.stats().deliverySavings.count, 0);
   } finally {
     forge.close();
   }
