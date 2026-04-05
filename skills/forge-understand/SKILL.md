@@ -22,4 +22,5 @@ Use ContextForge to produce a broad repository understanding pass.
    - the most important top-level areas
    - likely entrypoints
    - the most important files to read first
-5. Do not manually read many files unless the user explicitly asks for a deeper drilldown.
+5. Keep the first answer compact and receipt-first.
+6. Do not manually read many files unless the user explicitly asks for a deeper drilldown or ContextForge says the first pass is insufficient.

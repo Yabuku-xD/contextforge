@@ -94,7 +94,7 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     const overview = forge.understand("Understand the entire contextforge monorepo structure - every file, folder, and subfolder, and explain what they are doing.");
     assert.ok(overview.topLevel.length > 0);
     assert.ok(overview.importantFiles.length > 0);
-    assert.match(overview.summary, /Important files to read first|representative files/i);
+    assert.match(overview.summary, /representative files|Key entrypoints and anchor files/i);
     assert.match(overview.mode, /inventory_(first|walk)|exhaustive_walk/);
     assert.match(overview.guidance, /first-pass repository overview|deeper repository map|exhaustive repository digest/i);
 
@@ -113,7 +113,10 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     assert.ok(walk.audit.answerIfAskedWhetherWholeProjectWasRead.includes("Yes."));
     assert.ok(walk.audit.answerIfAskedWhetherEveryCornerWasRead.includes("Yes."));
     assert.match(walk.guidance, /exhaustive repository digest/i);
+    assert.match(walk.guidance, /Do not manually read additional files/i);
     assert.match(walk.summary, /opened all .* repository files locally/i);
+    assert.doesNotMatch(walk.summary, /Start with these representative files/i);
+    assert.match(walk.summary, /do not open them unless the user explicitly asks/i);
 
     const routed = forge.understand("Go through every single file, folder, and subfolder in this project.");
     assert.equal(routed.mode, "exhaustive_walk");

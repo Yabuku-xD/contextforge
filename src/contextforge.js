@@ -702,7 +702,7 @@ export class ContextForge {
       summary,
       mode: exhaustive ? "exhaustive_walk" : "inventory_walk",
       guidance: exhaustive
-        ? "Use this as the exhaustive repository digest. ContextForge opened every repository file locally, read the full body of each text file, scanned binary assets as raw bytes, and grouped the findings by package and directory so you can answer whole-project questions without spawning subagents first."
+        ? "Use this as the exhaustive repository digest. ContextForge opened every repository file locally, read the full body of each text file, scanned binary assets as raw bytes, and grouped the findings by package and directory so you can answer whole-project questions from this result alone. Do not manually read additional files for the first response unless the user explicitly asks for drilldown or coverage is incomplete."
         : "Use this as the deeper repository map before spawning subagents or manually reading many files. Answer from these sections first, then drill into specific files only if the user asks or a section is ambiguous.",
       coverage: exhaustive
         ? [
@@ -3728,7 +3728,11 @@ export class ContextForge {
       directoryText,
       roleText,
       rootFiles.length ? `Key root files: ${rootFiles.slice(0, 6).join(", ")}.` : null,
-      importantFiles.length ? `Start with these representative files: ${importantText}.` : null,
+      importantFiles.length
+        ? exhaustive
+          ? `Key entrypoints and anchor files include ${importantText}. Mention them in the first answer, but do not open them unless the user explicitly asks for drilldown.`
+          : `Start with these representative files: ${importantText}.`
+        : null,
       exhaustive
         ? "This pass still returns a compact digest, but it did open every repository file locally before grouping the findings by package and directory."
         : "This pass summarizes each major area with representative files so you can answer broad repo questions without crawling every file body first."

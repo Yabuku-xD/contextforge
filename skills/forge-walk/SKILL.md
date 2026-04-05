@@ -17,9 +17,10 @@ Use ContextForge's deeper repo map for exhaustive repository prompts.
 2. Call `forge_start` with the query when the task is non-trivial.
 3. Call `forge_walk` with the query.
 4. Present:
-   - the summary
-   - top-level areas
-   - package sections
-   - directory sections
-   - representative files for each major area
-5. Answer from the walk result first. Do not immediately spawn subagents or manually inspect dozens of files unless the user asks for deeper detail.
+   - the coverage verdict
+   - whether indexed memory is complete or still warming
+   - the top-level architecture
+   - the major areas
+   - the key entrypoints and important files
+5. Keep the first answer receipt-first and compact. Avoid long tables unless the user explicitly asks for them.
+6. If `forge_walk` returns `exhaustive_walk`, answer from that audit alone for the initial response. Do not manually inspect additional files, representative files, or package entrypoints unless the user explicitly asks for a deeper drilldown or ContextForge reports incomplete coverage.

@@ -1,7 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
+
+import { createContextForge } from "../../src/contextforge.js";
+import { rememberActiveSession } from "../../src/session/runtime.js";
+
+function writableTempBase() {
+  const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(candidate, { recursive: true });
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("No writable temp directory available for hook tests.");
+}
 
 test("claude plugin hooks register a SessionStart guidance hook", () => {
   const hooks = JSON.parse(fs.readFileSync("hooks/hooks.json", "utf8"));
@@ -112,4 +131,48 @@ test("pretooluse routes output-heavy bash toward forge_batch", () => {
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_batch/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /permission-denied/i);
+});
+
+test("pretooluse denies built-in read after a recent exhaustive walk in the same session", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-hooks-"));
+  fs.mkdirSync(path.join(tempDir, ".git"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "package.json"), JSON.stringify({
+    name: "hook-test",
+    version: "1.0.0",
+    type: "module"
+  }, null, 2));
+  fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempDir, "src", "index.ts"), "export const value = 1;\n");
+
+  const forge = createContextForge(tempDir, { sessionId: "hook-session" });
+  try {
+    forge.walk("go through every single file folder and subfolder in this repository");
+    rememberActiveSession(tempDir, forge.sessionId, {
+      source: "test",
+      command: "forge-walk"
+    });
+  } finally {
+    forge.close();
+  }
+
+  const output = execFileSync(
+    process.execPath,
+    [path.resolve("hooks/pretooluse.mjs")],
+    {
+      cwd: tempDir,
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Read",
+        tool_input: {
+          file_path: "src/index.ts"
+        }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
+  assert.match(payload.hookSpecificOutput.permissionDecisionReason, /exhaustive repository walk/i);
+  assert.match(payload.hookSpecificOutput.permissionDecisionReason, /forge_read/i);
 });
