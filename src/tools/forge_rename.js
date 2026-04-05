@@ -1,6 +1,6 @@
 export const forgeRenameTool = {
   name: "forge_rename",
-  description: "Preview or apply a coordinated repository rename using graph context plus text search.",
+  description: "Preview or apply a coordinated rename for prompts like `rename this symbol`, `rename this API across the repo`, or `what files would this rename touch`.",
   parameters: {
     symbol_query: "string",
     new_name: "string",

@@ -1,6 +1,6 @@
 export const forgeWhyTool = {
   name: "forge_why",
-  description: "Why this symbol or behavior matters based on repo and session graphs.",
+  description: "Explain why something matters for prompts like `why does this file matter`, `what is this for`, `why is this important`, `why does this code exist`, or `how does this relate to the current task`, using repo and session graphs.",
   parameters: { query: "string" },
   execute(forge, args = {}) {
     return forge.why(args.query ?? "");

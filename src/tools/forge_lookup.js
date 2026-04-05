@@ -1,6 +1,6 @@
 export const forgeLookupTool = {
   name: "forge_lookup",
-  description: "Search the locally indexed output from prior ContextForge research batches without replaying raw command output into chat.",
+  description: "Search stored research output for prompts like `search the logs from earlier`, `find the error in the saved test output`, or `query previous command results without replaying raw output into chat`.",
   parameters: {
     queries: "string[]",
     source_id: "string?",

@@ -1,6 +1,6 @@
 export const forgeBashTool = {
   name: "forge_bash",
-  description: "Run a shell command inside the current repository with compact stdout and stderr previews.",
+  description: "Run a compact repo-local shell command for prompts like `run git status here`, `execute this command in the repo`, or `show me a small command result` when the output should stay short.",
   parameters: {
     command: "string",
     cwd: "string?",

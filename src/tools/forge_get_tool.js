@@ -1,6 +1,6 @@
 export const forgeGetTool = {
   name: "forge_tools",
-  description: "Returns ContextForge tool schemas or lists available tools.",
+  description: "List ContextForge tools or inspect a tool schema for prompts like `what can ContextForge do` or `show me the input for forge_walk`.",
   parameters: {
     tool_name: "string | 'list'"
   },

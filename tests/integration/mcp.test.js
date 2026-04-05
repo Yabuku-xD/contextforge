@@ -37,6 +37,15 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(tools.tools.some((tool) => tool.name === "forge_map"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_contracts"));
 
+    const toolDescriptions = Object.fromEntries(tools.tools.map((tool) => [tool.name, tool.description ?? ""]));
+    assert.match(toolDescriptions.forge_why, /why does this file matter|what is this for/i);
+    assert.match(toolDescriptions.forge_impact, /what breaks if I change X|what else is affected/i);
+    assert.match(toolDescriptions.forge_changes, /what changed on this branch|summarize the current changes/i);
+    assert.match(toolDescriptions.forge_batch, /run tests and summarize|show git diff without flooding chat/i);
+    assert.match(toolDescriptions.forge_lookup, /search the logs from earlier|saved test output/i);
+    assert.match(toolDescriptions.forge_symbol, /where is function X defined|find symbol named/i);
+    assert.match(toolDescriptions.forge_scope, /how is this project structured|which modules talk to each other/i);
+
     const resources = await client.listResources();
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/overview"));
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/flows"));

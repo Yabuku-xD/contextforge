@@ -16,17 +16,25 @@ Use ContextForge as the first stop for repository context work.
 1. Treat any text after the command as the user request.
 2. For non-trivial repository tasks, call `forge_start` first with that request.
 3. Route the request to the best ContextForge tool:
-   - broad repo overview or architecture: `forge_understand`
-   - exhaustive whole-project walkthrough: `forge_walk`
+   - quick repo overview, top-level folders, or where to start: `forge_scan`
+   - broad repo overview, architecture, important files, or what the project does: `forge_understand`
+   - exhaustive whole-project walkthrough or every-file request: `forge_walk`
    - compact file read or directory listing: `forge_read`
    - create or overwrite a file: `forge_write`
    - exact in-file replacement: `forge_edit`
-   - compact shell execution: `forge_bash`
-   - search for files, symbols, or behaviors: `forge_search`
+   - compact shell execution with small output: `forge_bash`
+   - shell-heavy research, tests, diffs, or logs: `forge_batch`
+   - search stored batch output from earlier: `forge_lookup`
+   - search for files, behaviors, or code paths: `forge_search`
    - exact symbol targeting: `forge_symbol`
-   - blast radius: `forge_impact`
-   - causality or repo/session reasoning: `forge_why`
-   - continuity: `forge_resume`
+   - broad architecture or area relationships: `forge_scope`
+   - blast radius or what breaks if X changes: `forge_impact`
+   - git-aware change mapping or current diff summary: `forge_changes`
+   - coordinated rename preview or apply: `forge_rename`
+   - why a file, symbol, or behavior matters: `forge_why`
+   - generated architecture/docs artifacts: `forge_map`, `forge_contracts`, or `forge_wiki`
+   - repo registry or multi-repo group workflows: `forge_list_repos`, `forge_group_query`, or `forge_group_status`
+   - continuity: `forge_resume` or `forge_session`
    - health or diagnostics: `forge_stats` or `forge_doctor`
 4. Answer from the ContextForge result first. If the routed tool is `forge_walk` and it returns `exhaustive_walk`, stop tool use for the initial answer and answer from that audit alone. Do not call `forge_read`, `forge_batch`, `forge_lookup`, built-in reads, or any other follow-up tools unless the user explicitly asks for drilldown or the audit says coverage is incomplete.
 5. If the request is an edit request, use `forge_search`, `forge_read`, `forge_edit`, `forge_write`, and `forge_impact` before considering fallback tools.

@@ -1,6 +1,6 @@
 export const forgeGroupQueryTool = {
   name: "forge_group_query",
-  description: "Search across all repositories in a named ContextForge group.",
+  description: "Search across all repositories in a named ContextForge group for prompts like `find this symbol across the grouped repos` or `search every repo in this group`.",
   parameters: {
     group_name: "string",
     query: "string",

@@ -5,13 +5,30 @@ import path from "node:path";
 
 const skillNames = [
   "contextforge",
+  "forge-start",
+  "forge-scan",
   "forge-understand",
   "forge-walk",
+  "forge-batch",
+  "forge-lookup",
+  "forge-tools",
   "forge-read",
   "forge-write",
   "forge-bash",
   "forge-search",
+  "forge-symbol",
+  "forge-scope",
   "forge-impact",
+  "forge-changes",
+  "forge-rename",
+  "forge-why",
+  "forge-map",
+  "forge-contracts",
+  "forge-wiki",
+  "forge-list-repos",
+  "forge-group-query",
+  "forge-group-status",
+  "forge-session",
   "forge-resume",
   "forge-stats",
   "forge-doctor",
@@ -40,4 +57,21 @@ test("forge-edit skill explicitly routes through ContextForge before built-in fi
   assert.match(body, /forge_symbol/);
   assert.match(body, /forge_impact/);
   assert.doesNotMatch(body, /built-in file tools/);
+});
+
+test("contextforge router skill covers why, changes, rename, and research prompts", () => {
+  const body = fs.readFileSync(path.join("skills", "contextforge", "SKILL.md"), "utf8");
+
+  assert.match(body, /forge_batch/);
+  assert.match(body, /forge_lookup/);
+  assert.match(body, /forge_scope/);
+  assert.match(body, /forge_changes/);
+  assert.match(body, /forge_rename/);
+  assert.match(body, /forge_why/);
+  assert.match(body, /forge_map/);
+  assert.match(body, /forge_contracts/);
+  assert.match(body, /forge_wiki/);
+  assert.match(body, /forge_list_repos/);
+  assert.match(body, /forge_group_query/);
+  assert.match(body, /forge_group_status/);
 });
