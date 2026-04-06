@@ -12,7 +12,7 @@
   session continuity, and repo-native file operations that do not flood the chat window.
 </p>
 
-[![Release](https://img.shields.io/badge/release-v0.1.41-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![Release](https://img.shields.io/badge/release-v0.1.42-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
 [![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
