@@ -208,7 +208,7 @@ function normalizeStructuredContent(result) {
 
 function formatToolResult(forge, toolName, result) {
   const normalized = normalizeStructuredContent(result);
-  const compact = compactToolResult(toolName, normalized);
+  const compact = compactToolResult(forge, toolName, normalized);
   const rawSerialized = JSON.stringify(normalized);
   const payloadWithSavings = attachContextSavings(compact, rawSerialized);
   const text = JSON.stringify(payloadWithSavings);
@@ -296,7 +296,7 @@ function stripTrailingZeros(value) {
   return String(value).replace(/\.0+$|(\.\d*[1-9])0+$/u, "$1");
 }
 
-function compactToolResult(toolName, result) {
+function compactToolResult(forge, toolName, result) {
   if (toolName === "forge_scan" || toolName === "forge_understand" || toolName === "forge_walk") {
     const mode = result?.mode;
     if (mode === "inventory_first" || mode === "inventory_walk" || mode === "exhaustive_walk") {
@@ -306,6 +306,20 @@ function compactToolResult(toolName, result) {
 
   if (toolName === "forge_batch" || toolName === "forge_lookup") {
     return compactResearchResult(result);
+  }
+
+  if (toolName === "forge_search") {
+    return compactRankedResultList(forge, result, {
+      title: "search_matches",
+      firstAnswerWordLimit: 120
+    });
+  }
+
+  if (toolName === "forge_symbol" || toolName === "forge_impact") {
+    return compactRankedResultList(forge, result, {
+      title: toolName === "forge_symbol" ? "symbol_matches" : "impact_matches",
+      firstAnswerWordLimit: 140
+    });
   }
 
   return result;
@@ -416,6 +430,73 @@ function compactResearchResult(result) {
       firstAnswerWordLimit: 180
     }
   };
+}
+
+function compactRankedResultList(
+  forge,
+  result,
+  options: { title?: string; firstAnswerWordLimit?: number } = {}
+) {
+  const sourceItems = Array.isArray(result)
+    ? result
+    : Array.isArray(result?.items)
+    ? result.items
+    : [];
+  const items = sourceItems
+    .slice(0, 6)
+    .map((entry, index) => compactRankedResultEntry(forge, entry, index));
+
+  const payload = result && typeof result === "object" && !Array.isArray(result)
+    ? result
+    : {};
+
+  return {
+    ...payload,
+    kind: options.title ?? "matches",
+    resultCount: sourceItems.length,
+    items,
+    responsePolicy: {
+      delivery: "receipt_first",
+      rankedEvidenceOnly: true,
+      expandOnDemand: true,
+      firstAnswerWordLimit: options.firstAnswerWordLimit ?? 140,
+      chooseOneTargetThenDrillDown: true
+    }
+  };
+}
+
+function compactRankedResultEntry(forge, entry, index) {
+  const previewSource = entry?.preview ?? entry?.text ?? entry?.body ?? entry?.summary ?? "";
+  return {
+    rank: index + 1,
+    label: entry?.label ?? entry?.displayName ?? entry?.canonicalName ?? null,
+    path: entry?.path ?? forge?._relativePathForFile?.(entry?.fileId) ?? null,
+    kind: entry?.kind ?? entry?.edgeType ?? null,
+    symbolId: entry?.symbolId ?? null,
+    fileId: entry?.fileId ?? null,
+    score: normalizeScore(entry?.score),
+    sources: Array.isArray(entry?.sources) ? entry.sources.slice(0, 4) : undefined,
+    preview: compactSnippet(previewSource, 220)
+  };
+}
+
+function compactSnippet(value, maxChars = 220) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
+function normalizeScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Number(numeric.toFixed(4));
 }
 
 function compactAudit(audit) {

@@ -144,6 +144,7 @@ async function main(argv) {
   const rootOnlyCommands = new Set([
     "doctor",
     "index",
+    "derive",
     "resume",
     "stats",
     "purge",
@@ -178,6 +179,9 @@ async function main(argv) {
     switch (command) {
       case "index":
         console.log(JSON.stringify(forge.indexRepository(), null, 2));
+        break;
+      case "derive":
+        console.log(JSON.stringify(forge.deriveRepository(), null, 2));
         break;
       case "search":
         console.log(JSON.stringify(forge.search(query), null, 2));

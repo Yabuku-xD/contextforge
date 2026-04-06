@@ -98,11 +98,19 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
       name: "forge_search",
       arguments: {
         query: "checkout timeout",
-        limit: "3"
+        limit: "6"
       }
     });
     assert.ok(!search.isError);
     assert.match(search.content[0].text, /checkout/i);
+    assert.ok(search.content[0].text.length < 6000);
+    assert.match(search.content[0].text, /contextSavings/);
+    const searchPayload: any = search.structuredContent;
+    assert.ok(Array.isArray(searchPayload.items));
+    assert.ok(searchPayload.items.length <= 6);
+    assert.ok(searchPayload.items.every((item: any) => typeof item.preview === "string"));
+    assert.ok(searchPayload.contextSavings.savedBytes > 0);
+    assert.match(search.content[0].text, /chooseOneTargetThenDrillDown/);
 
     const scope = await client.callTool({
       name: "forge_scope",

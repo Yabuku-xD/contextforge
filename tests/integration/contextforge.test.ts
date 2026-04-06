@@ -564,3 +564,58 @@ test("forge_walk stays usable immediately after deferred startup", () => {
     }
   }
 });
+
+test("ensureRepositoryIndexed repairs repositories left in deriving after file ingestion completed", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-derive-repair-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "derive-repair-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export function runApp() {\n  return 'app';\n}\n");
+  fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export function runWorker() {\n  return runApp();\n}\n");
+
+  const forge = createContextForge(tempRoot, { sessionId: `derive_repair_${Date.now()}` });
+  try {
+    const indexed = forge.indexRepository();
+    assert.equal(indexed.indexStatus, "ready");
+    assert.ok(indexed.edgesIndexed >= 0);
+
+    forge.db.prepare(`DELETE FROM symbol_edges WHERE repo_id = ?`).run(forge.repoId);
+    forge.db.prepare(`DELETE FROM raptor_nodes WHERE repo_id = ?`).run(forge.repoId);
+    forge._writeRepositoryRow({
+      quickRepoStamp: forge._readRepositoryRow()?.quickRepoStamp ?? null,
+      fileCount: indexed.filesIndexed,
+      indexedFileCount: indexed.filesIndexed,
+      indexStatus: "deriving",
+      pendingDerivedState: 1,
+      lastIndexError: null,
+      batchSize: forge._readRepositoryRow()?.batchSize ?? null,
+      indexedTextFileCount: indexed.contentCoverage.textFilesIndexed,
+      indexedBinaryFileCount: indexed.contentCoverage.binaryFilesIndexed,
+      indexedLineCount: indexed.contentCoverage.indexedLineCount,
+      indexedByteCount: indexed.contentCoverage.indexedByteCount,
+      indexedAt: null,
+      lastIndexStartedAt: Date.now(),
+      lastIndexCompletedAt: null
+    });
+
+    const repaired = forge.ensureRepositoryIndexed({ reason: "status_check" });
+    assert.equal(repaired.resumedDerivedState, true);
+    assert.equal(repaired.indexStatus, "ready");
+    assert.ok(repaired.edgesIndexed > 0);
+    assert.ok(repaired.raptorNodesIndexed > 0);
+
+    const repoRow = forge._readRepositoryRow();
+    assert.equal(repoRow.indexStatus, "ready");
+    assert.equal(repoRow.pendingDerivedState, 0);
+    assert.ok(repoRow.lastIndexCompletedAt > 0);
+
+    const deriveEventCount = forge.db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM session_events
+      WHERE repo_id = ? AND session_id = ? AND event_type = 'derive_resume'
+    `).get(forge.repoId, forge.sessionId).count;
+    assert.equal(deriveEventCount, 1);
+  } finally {
+    forge.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

@@ -2957,10 +2957,12 @@ export class ContextForge {
   }
 
   _spawnDeferredStartupPrime(reason, estimatedFileCount, batchSize) {
+    const heapFlag = `--max-old-space-size=${this._backgroundHeapMb()}`;
     const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
-    const child = spawn(process.execPath, [cliPath, "index", this.rootDir], {
+    const child = spawn(process.execPath, [heapFlag, cliPath, "index", this.rootDir], {
       cwd: this.rootDir,
       stdio: "ignore",
+      detached: true,
       env: {
         ...process.env,
         CONTEXTFORGE_INDEX_BATCH_SIZE: String(batchSize),
@@ -2986,6 +2988,17 @@ export class ContextForge {
         if (code === 0) {
           const row = this._readRepositoryRow();
           const counts = this._repoCounts();
+          if (this._hasPendingDerivedState(row, counts)) {
+            this._deferredIndexState = {
+              status: "deriving",
+              estimatedFileCount,
+              syncReason: reason,
+              ...this._buildIndexProgressSummary(row, counts),
+              note: "Background prime finished file ingestion and re-queued the remaining derived-state rebuild."
+            };
+            this._spawnDeferredDerivedRepair(reason, estimatedFileCount, row?.batchSize ?? batchSize);
+            return;
+          }
           this._deferredIndexState = {
             status: row?.indexStatus ?? "ready",
             estimatedFileCount,
@@ -3015,6 +3028,208 @@ export class ContextForge {
     });
   }
 
+  _backgroundHeapMb() {
+    const raw = Number.parseInt(process.env.CONTEXTFORGE_BACKGROUND_HEAP_MB ?? "", 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 8192;
+  }
+
+  _hasPendingDerivedState(repoRow, counts = this._repoCounts()) {
+    if (!repoRow) {
+      return false;
+    }
+
+    const pendingDerived = Boolean(repoRow.pendingDerivedState) || repoRow.indexStatus === "deriving";
+    if (!pendingDerived) {
+      return false;
+    }
+
+    return counts.filesIndexed > 0 && counts.chunksIndexed > 0;
+  }
+
+  _shouldDeferDerivedRepair(repoRow, counts = this._repoCounts()) {
+    const raw = Number.parseInt(process.env.CONTEXTFORGE_INLINE_DERIVE_THRESHOLD ?? "", 10);
+    const inlineThreshold = Number.isFinite(raw) && raw > 0 ? raw : 200;
+    const fileCount = repoRow?.fileCount ?? counts.filesIndexed ?? 0;
+    return fileCount > inlineThreshold || counts.symbolsIndexed > 5000 || counts.chunksIndexed > 5000;
+  }
+
+  _queueDeferredDerivedRepair(reason, repoRow, counts = this._repoCounts()) {
+    const estimatedFileCount = repoRow?.fileCount ?? counts.filesIndexed ?? 0;
+    const batchSize = repoRow?.batchSize ?? this._resolveIndexBatchSize(null, estimatedFileCount);
+
+    if (!this._deferredIndexChild) {
+      this._deferredIndexState = {
+        status: "deriving",
+        estimatedFileCount,
+        syncReason: reason,
+        note: "ContextForge detected a pending derived-state rebuild and re-queued it in the background."
+      };
+      this._spawnDeferredDerivedRepair(reason, estimatedFileCount, batchSize);
+    }
+
+    return {
+      ...this._buildDeferredIndexFallback({
+        reason,
+        status: "deriving",
+        estimatedFileCount,
+        note: "ContextForge finished file ingestion earlier, but the derived graph/memory rebuild is still pending. It has been re-queued in the background."
+      }),
+      stalledDerivedState: true,
+      repairQueued: true
+    };
+  }
+
+  _spawnDeferredDerivedRepair(reason, estimatedFileCount, batchSize) {
+    const heapFlag = `--max-old-space-size=${this._backgroundHeapMb()}`;
+    const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+    const child = spawn(process.execPath, [heapFlag, cliPath, "derive", this.rootDir], {
+      cwd: this.rootDir,
+      stdio: "ignore",
+      detached: true,
+      env: {
+        ...process.env,
+        CONTEXTFORGE_INDEX_BATCH_SIZE: String(batchSize),
+        CONTEXTFORGE_USE_ACTIVE_SESSION: "0",
+        CONTEXTFORGE_REMEMBER_SESSION: "0"
+      }
+    });
+
+    this._deferredIndexChild = child;
+    this._deferredIndexState = {
+      status: "deriving",
+      estimatedFileCount,
+      syncReason: reason
+    };
+
+    child.unref?.();
+    child.once("exit", (code) => {
+      this._deferredIndexChild = null;
+      if (this._closed) {
+        return;
+      }
+      try {
+        const row = this._readRepositoryRow();
+        const counts = this._repoCounts();
+        this._deferredIndexState = {
+          status: code === 0 ? row?.indexStatus ?? "ready" : "error",
+          estimatedFileCount,
+          syncReason: reason,
+          ...this._buildIndexProgressSummary(row, counts),
+          error: code === 0 ? undefined : `Background derive repair exited with code ${code ?? "unknown"}`
+        };
+      } catch (error) {
+        if (!isDatabaseLockError(error)) {
+          throw error;
+        }
+        this._deferredIndexState = {
+          status: code === 0 ? "deriving" : "error",
+          estimatedFileCount,
+          syncReason: reason,
+          note: code === 0
+            ? "Background derive repair finished, but live progress could not be read because SQLite was temporarily write-locked."
+            : "Background derive repair exited and SQLite was temporarily write-locked while checking progress."
+        };
+      }
+    });
+  }
+
+  deriveRepository(options: Record<string, any> = {}) {
+    const counts = this._repoCounts();
+    if (!counts.filesIndexed || !counts.chunksIndexed) {
+      return this.indexRepository({ force: options.force });
+    }
+    return this._resumePendingDerivedState({ reason: options.reason ?? "derive" });
+  }
+
+  _resumePendingDerivedState({ reason = "tool" } = {}) {
+    const repoRow = this._readRepositoryRow();
+    const counts = this._repoCounts();
+
+    if (!this._hasPendingDerivedState(repoRow, counts)) {
+      return {
+        ...counts,
+        repoId: this.repoId,
+        reusedIndex: true,
+        fingerprint: this.repoFingerprint ?? this._loadRepoFingerprint(),
+        syncReason: reason,
+        contentCoverage: this._buildIndexedMemoryCoverage(repoRow)
+      };
+    }
+
+    const quickRepoStamp = repoRow?.quickRepoStamp ?? this._currentQuickRepoStamp();
+    const startedAt = repoRow?.lastIndexStartedAt ?? Date.now();
+    const batchSize = repoRow?.batchSize ?? this._resolveIndexBatchSize(null, repoRow?.fileCount ?? counts.filesIndexed);
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const summary = this._rebuildDerivedStateFromIndex({
+        quickRepoStamp,
+        batchSize,
+        startedAt
+      });
+      this.db.exec("COMMIT");
+
+      this._invalidateRepoCaches();
+      this._markRepoSynced();
+      this.repoFingerprint = summary.repoFingerprint;
+      this._quickRepoStamp = quickRepoStamp;
+      this._ensureWatcher();
+
+      const resumedSummary = {
+        repoId: this.repoId,
+        filesIndexed: summary.filesIndexed,
+        symbolsIndexed: summary.symbolsIndexed,
+        chunksIndexed: summary.chunksIndexed,
+        edgesIndexed: summary.edgesIndexed,
+        raptorNodesIndexed: summary.raptorNodesIndexed,
+        reusedIndex: false,
+        fingerprint: summary.repoFingerprint,
+        quickRepoStamp,
+        indexStatus: "ready",
+        resumedDerivedState: true,
+        syncReason: reason,
+        contentCoverage: summary.contentCoverage
+      };
+
+      this._registerIndexedRepo(resumedSummary);
+      recordSessionEvent(this.db, {
+        repoId: this.repoId,
+        sessionId: this.sessionId,
+        eventType: "derive_resume",
+        payload: {
+          reason,
+          fileCount: summary.filesIndexed,
+          symbolCount: summary.symbolsIndexed,
+          edgeCount: summary.edgesIndexed,
+          raptorNodeCount: summary.raptorNodesIndexed,
+          fingerprint: summary.repoFingerprint
+        }
+      });
+
+      return resumedSummary;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      const coverage = this._buildIndexedMemoryCoverage(repoRow);
+      this._writeRepositoryRow({
+        quickRepoStamp,
+        fileCount: repoRow?.fileCount ?? counts.filesIndexed,
+        indexedFileCount: counts.filesIndexed,
+        indexStatus: "error",
+        pendingDerivedState: 1,
+        lastIndexError: error.message,
+        batchSize,
+        indexedTextFileCount: coverage.textFilesIndexed,
+        indexedBinaryFileCount: coverage.binaryFilesIndexed,
+        indexedLineCount: coverage.indexedLineCount,
+        indexedByteCount: coverage.indexedByteCount,
+        indexedAt: null,
+        lastIndexStartedAt: startedAt,
+        lastIndexCompletedAt: null
+      });
+      throw error;
+    }
+  }
+
   ensureRepositoryIndexed({ reason = "tool", force = false, eagerPrime = false } = {}) {
     let counts;
     let repoRow;
@@ -3032,6 +3247,13 @@ export class ContextForge {
     }
     const hasIndex = counts.filesIndexed > 0 && counts.chunksIndexed > 0;
     const watcherAvailable = this._ensureWatcher();
+
+    if (!force && hasIndex && !this._deferredIndexChild && this._hasPendingDerivedState(repoRow, counts)) {
+      if (this._shouldDeferDerivedRepair(repoRow, counts)) {
+        return this._queueDeferredDerivedRepair(reason, repoRow, counts);
+      }
+      return this._resumePendingDerivedState({ reason });
+    }
 
     if (!force && !eagerPrime && ["warming", "indexing", "deriving"].includes(repoRow?.indexStatus) && hasIndex) {
       return {
@@ -3321,6 +3543,8 @@ export class ContextForge {
       return {
         name: manifest.name ?? null,
         version: manifest.version ?? null,
+        packageManager: typeof manifest.packageManager === "string" ? manifest.packageManager : null,
+        workspaceManager: detectWorkspaceManager(this.rootDir, manifest),
         type: manifest.type ?? null,
         main: manifest.main ?? null,
         module: manifest.module ?? null,
@@ -3569,12 +3793,16 @@ export class ContextForge {
     const workspaceText = packages?.length
       ? `Workspace packages: ${packages.slice(0, 6).map((pkg) => pkg.name ?? pkg.path).join(", ")}${packages.length > 6 ? `, and ${packages.length - 6} more` : ""}.`
       : null;
+    const workspaceManagerText = packageInfo?.workspaceManager
+      ? `Workspace manager: ${packageInfo.workspaceManager}.`
+      : null;
     const manifestText = packageInfo?.name
       ? `${packageInfo.name}${packageInfo.version ? `@${packageInfo.version}` : ""}`
       : "no package manifest detected";
 
     return [
       `Package: ${manifestText}.`,
+      workspaceManagerText,
       topLevel.length ? `Top-level layout: ${folderText}.` : "Top-level layout: no indexed files.",
       workspaceText,
       entrypoints.length ? `Likely entrypoints: ${entryText}.` : null,
@@ -3858,6 +4086,9 @@ export class ContextForge {
     const auditText = audit
       ? `Exhaustive audit opened all ${audit.fileCountInspected} repository files locally (${audit.textFileCount} full text bodies, ${audit.binaryFileCount} binary assets scanned as bytes).`
       : null;
+    const workspaceManagerText = packageInfo?.workspaceManager
+      ? `Workspace manager: ${packageInfo.workspaceManager}.`
+      : null;
     const roleText = audit?.roleBreakdown?.length
       ? `Most common file roles: ${audit.roleBreakdown.slice(0, 4).map((entry) => `${entry.role} (${entry.count})`).join(", ")}.`
       : null;
@@ -3869,6 +4100,7 @@ export class ContextForge {
 
     return [
       `Package: ${manifestText}.`,
+      workspaceManagerText,
       topLevel.length ? `Top-level layout: ${topLevelText}.` : "Top-level layout: no indexed files.",
       auditText,
       memoryText,
@@ -4373,6 +4605,32 @@ function topLevelAreaForPath(relativePath) {
     return "root";
   }
   return normalized.split("/")[0];
+}
+
+function detectWorkspaceManager(rootDir, manifest) {
+  const packageManager = typeof manifest?.packageManager === "string"
+    ? String(manifest.packageManager).split("@")[0]
+    : null;
+  if (packageManager) {
+    return packageManager;
+  }
+
+  const signals = [
+    ["pnpm", "pnpm-lock.yaml"],
+    ["yarn", "yarn.lock"],
+    ["bun", "bun.lock"],
+    ["bun", "bun.lockb"],
+    ["npm", "package-lock.json"],
+    ["npm", "npm-shrinkwrap.json"]
+  ];
+
+  for (const [manager, marker] of signals) {
+    if (exists(path.join(rootDir, marker))) {
+      return manager;
+    }
+  }
+
+  return null;
 }
 
 function escapeRegExp(value) {
