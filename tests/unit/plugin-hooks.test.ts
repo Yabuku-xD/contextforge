@@ -38,6 +38,8 @@ test("claude plugin hooks register PreToolUse routing guards", () => {
   assert.ok(matchers.includes("Bash"));
   assert.ok(matchers.includes("Read"));
   assert.ok(matchers.includes("Grep"));
+  assert.ok(matchers.includes("Write"));
+  assert.ok(matchers.includes("Edit"));
   assert.ok(matchers.includes("Agent"));
   assert.ok(matchers.includes("Task"));
   for (const entry of preToolUse) {
@@ -181,6 +183,79 @@ test("pretooluse denies built-in read after a recent exhaustive walk in the same
   assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /exhaustive repository walk/i);
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /forge_read/i);
+});
+
+test("pretooluse nudges plain Read toward forge_read by default", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["dist/hooks/pretooluse.js"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Read",
+        tool_input: { file_path: "src/router/query-signals.ts" }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_read/);
+  assert.match(payload.hookSpecificOutput.additionalContext, /default path/i);
+});
+
+test("pretooluse nudges plain Write toward forge_write by default", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["dist/hooks/pretooluse.js"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "src/new-file.ts", content: "export const x = 1;" }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_write/);
+});
+
+test("pretooluse nudges plain Edit toward forge_edit by default", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["dist/hooks/pretooluse.js"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: { file_path: "src/foo.ts", old_string: "a", new_string: "b" }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_edit/);
+});
+
+test("pretooluse nudges plain Bash toward forge_bash by default", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["dist/hooks/pretooluse.js"],
+    {
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "echo hello" }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.match(payload.hookSpecificOutput.additionalContext, /forge_bash/);
 });
 
 test("pretooluse does not create a repository database just to inspect recent walk state", () => {

@@ -27,6 +27,7 @@ import { buildResumeSummary } from "./session/resume.js";
 import { searchSessionEvents } from "./session/search.js";
 import { classifyContent } from "./router/classify-content.js";
 import { decideRoute } from "./router/bypass-policy.js";
+import { extractQuerySignals } from "./router/query-signals.js";
 import { safeCompress } from "./compression/safe-compress.js";
 import { createPage, touchPage } from "./pager/pages.js";
 import { noteFault, retrievalHandle } from "./pager/page-faults.js";
@@ -3899,13 +3900,18 @@ export class ContextForge {
   }
 
   _shouldUseInventoryWalk(query) {
-    const lowered = String(query ?? "").toLowerCase();
-    return /\b(every single file|every file|all files|all folders|all directories|every folder|every directory|subfolder|subfolders|drill into each package|comprehensive understanding|comprehensive repo|go through every|walk the repo|walk through the repo|walk the project|whole monorepo|entire monorepo)\b/.test(lowered);
+    const signals = extractQuerySignals(query);
+    if (signals.negation) return false;
+    return signals.broadRepo || signals.exhaustive;
   }
 
   _shouldUseExhaustiveWalk(query) {
-    const lowered = String(query ?? "").toLowerCase();
-    return /\b(every single file|every file|all files|go through every|go through each|each file|each module|comprehensive understanding|full audit|audit the repo|entire monorepo)\b/.test(lowered);
+    const raw = String(query ?? "").trim();
+    if (!raw) return false;
+    const signals = extractQuerySignals(raw);
+    if (signals.negation) return false;
+    if (signals.scopeHints.length > 0) return false;
+    return signals.exhaustive;
   }
 
   _buildPackageSections({ files, packages, entrypoints, query, packageInfo, audit = null }) {

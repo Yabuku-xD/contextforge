@@ -4,47 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { openDatabase, isDatabaseLockError } from "../src/storage/db.js";
 import { readActiveSession } from "../src/session/runtime.js";
-
-const WHOLE_REPO_PATTERNS = [
-  /\bevery\s+single\s+file\b/i,
-  /\bwhole\s+repo(?:sitory)?\b/i,
-  /\bentire\s+repo(?:sitory)?\b/i,
-  /\bfull\s+repo(?:sitory)?\b/i,
-  /\bwhole\s+project\b/i,
-  /\bentire\s+project\b/i,
-  /\bmonorepo\b/i,
-  /\bproject\s+structure\b/i,
-  /\barchitecture\s+overview\b/i,
-  /\bgo\s+through\s+the\s+repo\b/i,
-  /\bpackages?\b/i,
-  /\bfolders?\b/i,
-  /\bsubfolders?\b/i,
-  /\bwalk\s+the\s+repo\b/i
-];
-
-const BROAD_DISCOVERY_COMMANDS = [
-  /\bfind\s+\S*\s*-maxdepth\b/i,
-  /\bfind\s+\S*\s+-type\s+f\b/i,
-  /\btree\b/i,
-  /\bls\s+-R\b/i,
-  /\brg\s+--files\b/i,
-  /\bfd\b/i,
-  /\bgit\s+ls-files\b/i
-];
-
-const OUTPUT_HEAVY_COMMANDS = [
-  /\bgit\s+diff\b/i,
-  /\bgit\s+log\b/i,
-  /\bnpm\s+test\b/i,
-  /\bpnpm\s+test\b/i,
-  /\byarn\s+test\b/i,
-  /\bpytest\b/i,
-  /\bcargo\s+test\b/i,
-  /\bgo\s+test\b/i,
-  /\brg\s+.+/i,
-  /\bgrep\s+-R\b/i,
-  /\bcat\s+.+/i
-];
+import { extractQuerySignals } from "../src/router/query-signals.js";
 
 const RECENT_EXHAUSTIVE_WALK_WINDOW_MS = 5 * 60 * 1000;
 
@@ -72,20 +32,18 @@ function normalizeText(value) {
   }
 }
 
-function matchesAny(text, patterns) {
-  return patterns.some((pattern) => pattern.test(text));
-}
-
 function isWholeRepoRequest(text) {
-  return matchesAny(text, WHOLE_REPO_PATTERNS);
+  const signals = extractQuerySignals(text);
+  if (signals.negation) return false;
+  return signals.broadRepo || signals.exhaustive;
 }
 
 function isBroadDiscoveryCommand(command) {
-  return matchesAny(command, BROAD_DISCOVERY_COMMANDS);
+  return extractQuerySignals(command).broadDiscovery;
 }
 
 function isOutputHeavyCommand(command) {
-  return matchesAny(command, OUTPUT_HEAVY_COMMANDS);
+  return extractQuerySignals(command).outputHeavy;
 }
 
 function formatContext(additionalContext) {
@@ -133,6 +91,42 @@ function createResearchRoutingGuidance(toolName) {
     "If ContextForge is unavailable or permission-denied, use narrower built-in commands and avoid dumping large raw output into chat.",
     `Current tool: ${toolName}. Use it only if ContextForge is insufficient for the task.`,
     "</contextforge_research>"
+  ].join("\n");
+}
+
+const DEFAULT_FILE_OP_ROUTES = {
+  Read: {
+    forgeTool: "forge_read",
+    note: "forge_read returns compact excerpts and directory listings with built-in paging."
+  },
+  Write: {
+    forgeTool: "forge_write",
+    note: "forge_write is repo-aware and keeps session state in sync."
+  },
+  Edit: {
+    forgeTool: "forge_edit",
+    note: "forge_edit performs exact in-file replacement with coordinated rename awareness."
+  },
+  Bash: {
+    forgeTool: "forge_bash",
+    note: "forge_bash runs repo-local commands and keeps output compact; use forge_batch for shell-heavy research."
+  },
+  Grep: {
+    forgeTool: "forge_search",
+    note: "forge_search is hybrid BM25+vector+graph retrieval. Use forge_symbol for exact identifiers."
+  }
+};
+
+function createFileOpRoutingGuidance(toolName) {
+  const route = DEFAULT_FILE_OP_ROUTES[toolName];
+  if (!route) return null;
+  return [
+    "<contextforge_fileop>",
+    `ContextForge is the default path for ${toolName} in this repository.`,
+    `Prefer ${route.forgeTool} first — ${route.note}`,
+    "Only fall back to the built-in tool when ContextForge is unavailable, permission-denied, or the operation must run outside the repository boundary.",
+    `Current tool: ${toolName}. Use it only if ${route.forgeTool} is insufficient for the task.`,
+    "</contextforge_fileop>"
   ].join("\n");
 }
 
@@ -232,6 +226,16 @@ if ((toolName === "Agent" || toolName === "Task") && isWholeRepoRequest(toolText
     response = formatContext(createRepoRoutingGuidance(toolName));
   } else if (toolName === "Grep" && isOutputHeavyCommand(toolText)) {
     response = formatContext(createResearchRoutingGuidance(toolName));
+  }
+}
+
+// Default file-op routing: if no more specific branch already fired, nudge
+// the agent toward the ContextForge equivalent of Read / Write / Edit / Bash /
+// Grep so the plugin — not the user's CLAUDE.md — enforces the preference.
+if (!response) {
+  const defaultGuidance = createFileOpRoutingGuidance(toolName);
+  if (defaultGuidance) {
+    response = formatContext(defaultGuidance);
   }
 }
 
