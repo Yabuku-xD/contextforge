@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.43`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.44`.
 
 ## What This Guide Covers
 
@@ -64,7 +64,7 @@ The plugin includes:
 
 - a Claude Code marketplace package in [.claude-plugin/plugin.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/plugin.json)
 - marketplace metadata in [.claude-plugin/marketplace.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/marketplace.json)
-- a stdio MCP definition in [.mcp.json](/Users/yabuku/Downloads/context-forge/.mcp.json)
+- a bundled stdio MCP definition in [mcp.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/mcp.json)
 - SessionStart routing guidance in [hooks/sessionstart.ts](/Users/yabuku/Downloads/context-forge/hooks/sessionstart.ts)
 - PreToolUse routing guards in [hooks/pretooluse.ts](/Users/yabuku/Downloads/context-forge/hooks/pretooluse.ts)
 
