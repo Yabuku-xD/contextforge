@@ -6,7 +6,10 @@ import { ensureDir, exists, readText, writeText } from "../utils/fs.js";
 const ACTIVE_SESSION_FILE = "active-session.json";
 const ENV_SESSION_KEYS = ["CONTEXTFORGE_SESSION_ID", "CLAUDE_SESSION_ID", "SESSION_ID"];
 
-export function resolveRuntimeSessionId(rootDir, { sessionId, preferActive = false, env = process.env } = {}) {
+export function resolveRuntimeSessionId(
+  rootDir: string,
+  { sessionId, preferActive = false, env = process.env }: { sessionId?: string | null; preferActive?: boolean; env?: NodeJS.ProcessEnv } = {}
+) {
   if (sessionId) {
     return String(sessionId);
   }
@@ -24,7 +27,7 @@ export function resolveRuntimeSessionId(rootDir, { sessionId, preferActive = fal
   return null;
 }
 
-export function rememberActiveSession(rootDir, sessionId, metadata = {}) {
+export function rememberActiveSession(rootDir: string, sessionId: string | null | undefined, metadata: Record<string, any> = {}) {
   if (!sessionId) {
     return null;
   }
@@ -40,7 +43,7 @@ export function rememberActiveSession(rootDir, sessionId, metadata = {}) {
   return payload;
 }
 
-export function readActiveSession(rootDir) {
+export function readActiveSession(rootDir: string) {
   const filePath = activeSessionFile(rootDir);
   if (!exists(filePath)) {
     return null;
@@ -63,7 +66,7 @@ export function readActiveSession(rootDir) {
   }
 }
 
-export function clearActiveSession(rootDir, sessionId = null) {
+export function clearActiveSession(rootDir: string, sessionId: string | null = null) {
   const current = readActiveSession(rootDir);
   if (!current) {
     return {
@@ -87,6 +90,6 @@ export function clearActiveSession(rootDir, sessionId = null) {
   };
 }
 
-function activeSessionFile(rootDir) {
+function activeSessionFile(rootDir: string) {
   return path.join(path.resolve(rootDir), ".contextforge", ACTIVE_SESSION_FILE);
 }

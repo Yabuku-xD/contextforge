@@ -1,7 +1,7 @@
 import { clip, tokenize, unique } from "../utils/text.js";
 import { listSessionEvents } from "./events.js";
 
-export function searchSessionEvents(db, {
+export function searchSessionEvents(db: any, {
   repoId,
   sessionId,
   query = "",
@@ -9,9 +9,9 @@ export function searchSessionEvents(db, {
   seedFiles = [],
   seedSymbols = [],
   seedHints = []
-}) {
+}: Record<string, any>) {
   const normalizedQuery = String(query ?? "").trim();
-  const tokens = extractFtsTerms(normalizedQuery).slice(0, 8);
+  const tokens: string[] = extractFtsTerms(normalizedQuery).slice(0, 8);
   const candidates = new Map();
 
   if (tokens.length) {
@@ -63,7 +63,7 @@ export function searchSessionEvents(db, {
     ...seedHints,
     ...seedFiles,
     ...seedSymbols
-  ].map((value) => String(value ?? "").toLowerCase()).filter(Boolean));
+  ].map((value) => String(value ?? "").toLowerCase()).filter(Boolean)) as string[];
   const loweredFiles = new Set(seedFiles.map((value) => String(value ?? "").toLowerCase()));
   const loweredSymbols = new Set(seedSymbols.map((value) => String(value ?? "").toLowerCase()));
 
@@ -119,8 +119,8 @@ export function searchSessionEvents(db, {
     .slice(0, limit);
 }
 
-function compactSessionPayload(payload) {
-  const compact = {};
+function compactSessionPayload(payload: Record<string, any>) {
+  const compact: Record<string, any> = {};
   for (const key of ["filePath", "symbolId", "message", "decision", "note", "query", "toolName"]) {
     if (payload?.[key] != null) {
       compact[key] = payload[key];
@@ -147,9 +147,9 @@ function compactSessionPayload(payload) {
   return compact;
 }
 
-function extractFtsTerms(query) {
+function extractFtsTerms(query: string): string[] {
   return unique(tokenize(query)
     .flatMap((token) => token.split(/[^a-z0-9_]+/g))
     .map((token) => token.trim())
-    .filter(Boolean));
+    .filter(Boolean)) as string[];
 }

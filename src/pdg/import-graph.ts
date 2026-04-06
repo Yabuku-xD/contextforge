@@ -1,18 +1,18 @@
 import { makeId } from "../indexing/canonicalize.js";
 import { parseImports, resolveImportTargetFile } from "./import-specifiers.js";
 
-export function extractImportEdges({ repoId, symbols, files }) {
-  const symbolByFile = new Map();
+export function extractImportEdges({ repoId, symbols, files }: { repoId: string; symbols: any[]; files: any[] }) {
+  const symbolByFile = new Map<string, any[]>();
 
   for (const symbol of symbols) {
     if (!symbolByFile.has(symbol.fileId)) {
       symbolByFile.set(symbol.fileId, []);
     }
 
-    symbolByFile.get(symbol.fileId).push(symbol);
+    symbolByFile.get(symbol.fileId)?.push(symbol);
   }
 
-  const edges = [];
+  const edges: any[] = [];
   for (const file of files) {
     const importers = symbolByFile.get(file.fileId) ?? [];
     if (!importers.length) {
@@ -20,7 +20,7 @@ export function extractImportEdges({ repoId, symbols, files }) {
     }
 
     for (const spec of parseImports(file.content)) {
-      const targetFile = resolveImportTargetFile(file.relativePath, spec.sourcePath, files);
+      const targetFile: any = resolveImportTargetFile(file.relativePath, spec.sourcePath, files);
       if (!targetFile) {
         continue;
       }

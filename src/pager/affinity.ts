@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export function pageAffinity(page, context = {}) {
+export function pageAffinity(page: Record<string, any>, context: Record<string, any> = {}) {
   const sourceId = String(page.sourceItemId ?? "");
   const normalizedId = sourceId.toLowerCase();
   const activeFileMatch = (context.activeFiles ?? []).some((filePath) =>

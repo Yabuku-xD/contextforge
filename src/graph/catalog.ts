@@ -159,14 +159,16 @@ export function buildFlowCatalog({
 
       const touchedSymbols = [...visited]
         .map((symbolId) => symbolById.get(symbolId))
-        .filter(Boolean);
+        .filter((symbol): symbol is any => Boolean(symbol));
       const touchedFiles = unique([
         entry.path,
         ...touchedSymbols
-          .map((symbol) => files.find((fileItem) => fileItem.fileId === symbol.fileId)?.relativePath)
+          .map((symbol: any) => files.find((fileItem: any) => fileItem.fileId === symbol.fileId)?.relativePath)
           .filter(Boolean)
-      ]).sort();
-      const modules = unique(touchedFiles.map((relativePath) => path.dirname(relativePath) || ".")).sort();
+      ]) as string[];
+      touchedFiles.sort();
+      const modules = unique(touchedFiles.map((relativePath) => path.dirname(relativePath) || ".")) as string[];
+      modules.sort();
       const primarySymbol = seedSymbols[0] ?? touchedSymbols[0] ?? null;
 
       return {

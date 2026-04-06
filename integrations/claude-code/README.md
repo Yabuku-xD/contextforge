@@ -14,6 +14,8 @@ From a local checkout:
 node /absolute/path/to/contextforge/dist/src/cli.js install-claude .
 ```
 
+If you are developing ContextForge itself from source, run `npm run build` after changes and `npm run typecheck` to verify the compiler-checked TypeScript sources before reinstalling the local plugin.
+
 That writes a project-scoped `.mcp.json` entry automatically.
 
 Manual project-scoped `.mcp.json` example:

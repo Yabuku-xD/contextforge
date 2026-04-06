@@ -20,7 +20,7 @@ function rootsFile() {
   return path.join(contextforgeHome(), "registry-roots.json");
 }
 
-function readJson(filePath, fallback) {
+function readJson(filePath: string, fallback: any) {
   if (!exists(filePath)) {
     return fallback;
   }
@@ -32,7 +32,7 @@ function readJson(filePath, fallback) {
   }
 }
 
-function writeJson(filePath, value) {
+function writeJson(filePath: string, value: any) {
   writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
@@ -113,7 +113,7 @@ function pruneRegistryState() {
   return { repos, roots };
 }
 
-export function listRegisteredRepositories(options = {}) {
+export function listRegisteredRepositories(options: Record<string, any> = {}) {
   const includePaths = Boolean(options.includePaths);
   const { repos, roots } = pruneRegistryState();
   const rootByRepoId = new Map(roots.map((entry) => [entry.repoId, entry.rootPath]));

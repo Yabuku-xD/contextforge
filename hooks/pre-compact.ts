@@ -1,7 +1,7 @@
 import { createContextForge } from "../src/contextforge.js";
 import { rememberActiveSession, resolveRuntimeSessionId } from "../src/session/runtime.js";
 
-export function preCompact(rootDir, options = {}) {
+export function preCompact(rootDir: string, options: Record<string, any> = {}) {
   const sessionId = resolveRuntimeSessionId(rootDir, {
     sessionId: options.sessionId,
     preferActive: true

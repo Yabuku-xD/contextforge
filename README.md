@@ -12,7 +12,7 @@
   session continuity, and repo-native file operations that do not flood the chat window.
 </p>
 
-[![Release](https://img.shields.io/badge/release-v0.1.39-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![Release](https://img.shields.io/badge/release-v0.1.40-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
 [![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
@@ -41,7 +41,7 @@ ContextForge is an open-source MCP server, CLI, and Claude Code marketplace plug
 
 That lets Claude answer broad repository questions with compact receipts, trace changes through indexed graph relationships, keep large shell output out of chat, and operate on files inside the repo without constantly falling back to noisy manual exploration.
 
-The source tree now lives in `src/**/*.ts`, while the runnable CLI, MCP server, hooks, and tests are emitted under `dist/` during `npm install` / `npm run build`.
+The source tree now lives in `src/**/*.ts`, the hooks/tests/plugin bootstrap are TypeScript too, and the repo now passes a real `npm run typecheck` instead of relying on a transpile-only migration. The runnable CLI, MCP server, hooks, and tests are emitted under `dist/` during `npm install` / `npm run build`.
 
 [⬆ back to top](#readme)
 
@@ -172,6 +172,8 @@ Use ContextForge only. Show me the blast radius of changing createCheckout.
 ### Useful CLI Commands
 
 ```bash
+npm run typecheck
+npm test
 node ./dist/src/cli.js doctor .
 node ./dist/src/cli.js scoreboard .
 node ./dist/src/cli.js search "checkout timeout" .

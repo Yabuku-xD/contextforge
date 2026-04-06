@@ -62,8 +62,76 @@ const WATCHER_SETTLE_MS = 80;
 const DEFAULT_STARTUP_DEFER_FILE_THRESHOLD = 300;
 const DEFAULT_INDEX_BATCH_SIZE = 64;
 
+type RepositoryRow = {
+  contentFingerprint?: string | null;
+  quickRepoStamp?: string | null;
+  fileCount?: number | null;
+  indexedFileCount?: number | null;
+  indexStatus?: string | null;
+  pendingDerivedState?: number | null;
+  lastIndexError?: string | null;
+  batchSize?: number | null;
+  indexedTextFileCount?: number | null;
+  indexedBinaryFileCount?: number | null;
+  indexedLineCount?: number | null;
+  indexedByteCount?: number | null;
+  indexedAt?: number | null;
+  lastIndexStartedAt?: number | null;
+  lastIndexCompletedAt?: number | null;
+};
+
+type RepoCounts = {
+  filesIndexed: number;
+  symbolsIndexed: number;
+  chunksIndexed: number;
+  edgesIndexed: number;
+  raptorNodesIndexed: number;
+};
+
+type WhySeed = {
+  id: string;
+  label: string;
+  type: string;
+  source: string;
+  score: number;
+};
+
+type RegisteredRepoSummary = {
+  name?: string;
+  repoId?: string;
+  fileCount?: number;
+  symbolCount?: number;
+  edgeCount?: number;
+  raptorNodeCount?: number;
+  indexStatus?: string | null;
+  indexedAt?: number | null;
+};
+
+export interface ContextForge {
+  rootDir: string;
+  db: any;
+  repoId: string;
+  sessionId: string;
+  coreInstructions: string;
+  startupBrief: string;
+  repoFingerprint: string | null;
+  _repoState: any;
+  _repoInventory: any;
+  _repoAudit: any;
+  _quickRepoStamp: string | null;
+  _filePathById: any;
+  _realRoot: string | null;
+  _closed: boolean;
+  _deferredIndexState: any;
+  _deferredIndexChild: any;
+  _watcher: any;
+  _watcherSupported: boolean;
+  _dirtyPaths: Set<string>;
+  _inventoryDirty: boolean;
+}
+
 export class ContextForge {
-  constructor(rootDir, options = {}) {
+  constructor(rootDir: string, options: Record<string, any> = {}) {
     this.rootDir = path.resolve(rootDir);
     this.db = openDatabase(this.rootDir);
     this.repoId = sha1(this.rootDir);
@@ -93,7 +161,7 @@ export class ContextForge {
     this.db.close();
   }
 
-  indexRepository(options = {}) {
+  indexRepository(options: Record<string, any> = {}) {
     const inventory = this._loadRepoInventory();
     const quickRepoStamp = this._computeQuickRepoStamp(inventory.files);
     const batchSize = this._resolveIndexBatchSize(options.batchSize, inventory.files.length);
@@ -137,7 +205,7 @@ export class ContextForge {
     });
   }
 
-  search(query, options = {}) {
+  search(query: string, options: Record<string, any> = {}) {
     this.ensureRepositoryIndexed({ reason: "search" });
     const state = this._loadRepoState();
     const results = hybridSearch({
@@ -166,7 +234,7 @@ export class ContextForge {
     return results;
   }
 
-  symbol(query, options = {}) {
+  symbol(query: string, options: Record<string, any> = {}) {
     this.ensureRepositoryIndexed({ reason: "symbol" });
     const symbols = this._loadSymbols();
     const exact = exactSymbolSearch(query, symbols, options.limit ?? 10);
@@ -259,7 +327,7 @@ export class ContextForge {
     return buildResumeSummary(this.db, { repoId: this.repoId, sessionId: this.sessionId });
   }
 
-  async processArtifact(content, metadata = {}) {
+  async processArtifact(content: string, metadata: Record<string, any> = {}) {
     const contentType = classifyContent(content, metadata);
     const route = decideRoute(contentType);
 
@@ -437,7 +505,7 @@ export class ContextForge {
     ];
   }
 
-  async batch(commands, options = {}) {
+  async batch(commands: string[], options: Record<string, any> = {}) {
     const commandList = normalizeStringArray(commands).slice(0, 8);
     if (!commandList.length) {
       throw new Error("forge_batch requires at least one command.");
@@ -553,7 +621,7 @@ export class ContextForge {
     };
   }
 
-  lookup(queries, options = {}) {
+  lookup(queries: string[], options: Record<string, any> = {}) {
     const normalizedQueries = normalizeStringArray(queries).slice(0, 8);
     if (!normalizedQueries.length) {
       throw new Error("forge_lookup requires at least one query.");
@@ -770,7 +838,7 @@ export class ContextForge {
     };
   }
 
-  read(targetPath, options = {}) {
+  read(targetPath: string, options: Record<string, any> = {}) {
     const resolved = this._resolveWorkspacePath(targetPath);
     const relativePath = relativeTo(this.rootDir, resolved);
     const stat = fs.statSync(resolved);
@@ -830,7 +898,7 @@ export class ContextForge {
     };
   }
 
-  write(targetPath, content, options = {}) {
+  write(targetPath: string, content: string, options: Record<string, any> = {}) {
     const resolved = this._resolveWorkspacePath(targetPath, {
       allowMissing: true,
       createParent: coerceBoolean(options.createDirs, true)
@@ -863,7 +931,7 @@ export class ContextForge {
     };
   }
 
-  edit(targetPath, oldText, newText, options = {}) {
+  edit(targetPath: string, oldText: string, newText: string, options: Record<string, any> = {}) {
     const resolved = this._resolveWorkspacePath(targetPath);
     const relativePath = relativeTo(this.rootDir, resolved);
     const before = readText(resolved);
@@ -913,7 +981,7 @@ export class ContextForge {
     };
   }
 
-  async bash(command, options = {}) {
+  async bash(command: string, options: Record<string, any> = {}) {
     const watcherAvailable = this._ensureWatcher();
     const beforeQuickStamp = watcherAvailable
       ? this._quickRepoStamp
@@ -1020,7 +1088,7 @@ export class ContextForge {
     return recommendPrefetchPages({ recentEvents });
   }
 
-  purge({ maxAgeMs, includePages = true } = {}) {
+  purge({ maxAgeMs, includePages = true }: Record<string, any> = {}) {
     purgeOldSessionEvents(this.db, maxAgeMs);
     this.db.prepare(`DELETE FROM compression_events WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
     this.db.prepare(`DELETE FROM tool_receipts WHERE repo_id = ? AND session_id = ?`).run(this.repoId, this.sessionId);
@@ -1270,7 +1338,7 @@ export class ContextForge {
     };
   }
 
-  changes(options = {}) {
+  changes(options: Record<string, any> = {}) {
     this.ensureRepositoryIndexed({ reason: "changes" });
     const scope = normalizeChangeScope(options.scope);
     const baseRef = options.baseRef ? String(options.baseRef) : null;
@@ -1287,9 +1355,9 @@ export class ContextForge {
       ));
       const impactedSymbols = impacted
         .map((symbolId) => symbolIndex.get(symbolId))
-        .filter(Boolean)
+        .filter((symbol): symbol is any => Boolean(symbol))
         .slice(0, 8)
-        .map((symbol) => ({
+        .map((symbol: any) => ({
           symbolId: symbol.symbolId,
           canonicalName: symbol.canonicalName,
           displayName: symbol.displayName,
@@ -1320,7 +1388,7 @@ export class ContextForge {
     };
   }
 
-  rename(symbolQuery, newName, options = {}) {
+  rename(symbolQuery: string, newName: string, options: Record<string, any> = {}) {
     this.ensureRepositoryIndexed({ reason: "rename" });
     const normalizedQuery = String(symbolQuery ?? "").trim();
     const normalizedNewName = String(newName ?? "").trim();
@@ -1329,7 +1397,7 @@ export class ContextForge {
     }
 
     const symbols = this._loadSymbols();
-    const symbolById = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
+    const symbolById = new Map<string, any>(symbols.map((symbol) => [symbol.symbolId, symbol]));
     const [seed] = exactSymbolSearch(normalizedQuery, symbols, 1);
     if (!seed) {
       throw new Error(`Could not find a symbol matching "${normalizedQuery}".`);
@@ -1337,7 +1405,7 @@ export class ContextForge {
 
     const dryRun = coerceBoolean(options.dryRun, true);
     const wordBoundary = new RegExp(`\\b${escapeRegExp(seed.displayName)}\\b`, "g");
-    const connectedFiles = new Set();
+    const connectedFiles = new Set<string>();
     for (const edge of this._loadEdges()) {
       if (edge.fromSymbolId !== seed.symbolId && edge.toSymbolId !== seed.symbolId) {
         continue;
@@ -1350,7 +1418,7 @@ export class ContextForge {
     }
     connectedFiles.add(seed.fileId);
 
-    const conflictingSymbolsByFile = new Map();
+    const conflictingSymbolsByFile = new Map<string, any[]>();
     for (const symbol of symbols) {
       if (symbol.displayName !== seed.displayName || symbol.symbolId === seed.symbolId) {
         continue;
@@ -1365,9 +1433,9 @@ export class ContextForge {
       throw new Error(`Cannot safely rename "${seed.displayName}" because ${this._relativePathForFile(seed.fileId)} contains multiple symbols with that name.`);
     }
 
-    const edits = [];
-    const changedPaths = [];
-    const skippedFiles = [];
+    const edits: any[] = [];
+    const changedPaths: string[] = [];
+    const skippedFiles: any[] = [];
     for (const file of this._loadIndexedFiles({ includeContent: true })) {
       if (file.contentKind !== "text" || !file.contentLoaded || !file.content) {
         continue;
@@ -1380,7 +1448,7 @@ export class ContextForge {
         skippedFiles.push({
           path: file.relativePath,
           reason: "conflicting_same_name_symbol",
-          conflictingSymbols: conflicts.slice(0, 4).map((symbol) => ({
+          conflictingSymbols: conflicts.slice(0, 4).map((symbol: any) => ({
             symbolId: symbol.symbolId,
             canonicalName: symbol.canonicalName,
             displayName: symbol.displayName
@@ -1481,7 +1549,7 @@ export class ContextForge {
     };
   }
 
-  groupQuery(name, query, options = {}) {
+  groupQuery(name: string, query: string, options: Record<string, any> = {}) {
     const group = listRepoGroups(name);
     if (!group) {
       throw new Error(`Unknown repo group: ${name}`);
@@ -1563,7 +1631,7 @@ export class ContextForge {
     };
   }
 
-  map(query = "", options = {}) {
+  map(query = "", options: Record<string, any> = {}) {
     const overview = this.scan(query);
     const areas = this.areas(query);
     const flows = this.flows(query);
@@ -1584,7 +1652,7 @@ export class ContextForge {
     };
   }
 
-  wiki(query = "", options = {}) {
+  wiki(query = "", options: Record<string, any> = {}) {
     const overview = this.scan(query);
     const areas = this.areas(query);
     const flows = this.flows(query);
@@ -1607,7 +1675,7 @@ export class ContextForge {
     };
   }
 
-  contracts(query = "", options = {}) {
+  contracts(query = "", options: Record<string, any> = {}) {
     this.ensureRepositoryIndexed({ reason: "contracts" });
     const state = this._loadRepoState();
     const overview = this._buildInventoryOverview(query, {
@@ -1888,7 +1956,7 @@ export class ContextForge {
     }
   }
 
-  _rebuildDerivedStateFromIndex(options = {}) {
+  _rebuildDerivedStateFromIndex(options: Record<string, any> = {}) {
     const files = this._loadIndexedFiles({ includeContent: true, includeHashes: true });
     const symbols = this._loadSymbols();
     const pdgEdges = [
@@ -1961,15 +2029,15 @@ export class ContextForge {
     return summary;
   }
 
-  _buildWhySeeds(state, query) {
+  _buildWhySeeds(state: any, query: string): WhySeed[] {
     if (!query) {
       return [];
     }
 
-    const nodeIndex = new Map(state.repoGraph.nodes.map((node) => [node.id, node]));
-    const seeds = [];
-    const seen = new Set();
-    const addSeed = ({ id, label, type, source, score = 0 }) => {
+    const nodeIndex = new Map<string, any>(state.repoGraph.nodes.map((node: any) => [node.id, node]));
+    const seeds: WhySeed[] = [];
+    const seen = new Set<string>();
+    const addSeed = ({ id, label, type, source, score = 0 }: { id?: string | null; label?: string | null; type?: string | null; source?: string | null; score?: number }) => {
       if (!id || seen.has(id) || !nodeIndex.has(id)) {
         return;
       }
@@ -2018,7 +2086,7 @@ export class ContextForge {
     });
 
     for (const item of broadResults) {
-      const candidateId = item.symbolId ?? item.fileId ?? (nodeIndex.has(item.id) ? item.id : null);
+      const candidateId = item.symbolId ?? item.fileId ?? (item.id && nodeIndex.has(item.id) ? item.id : null);
       addSeed({
         id: candidateId,
         label: item.label,
@@ -2040,12 +2108,12 @@ export class ContextForge {
       }));
   }
 
-  _rankWhyGraph(repoGraph, seeds) {
+  _rankWhyGraph(repoGraph: any, seeds: WhySeed[]) {
     if (!seeds.length) {
       return [];
     }
 
-    const nodeIndex = new Map(repoGraph.nodes.map((node) => [node.id, node]));
+    const nodeIndex = new Map<string, any>(repoGraph.nodes.map((node: any) => [node.id, node]));
     const seedIds = seeds.map((seed) => seed.id);
     return personalizedPageRank({
       nodes: repoGraph.nodes,
@@ -2230,7 +2298,7 @@ export class ContextForge {
     });
   }
 
-  _consumeDirtyPaths() {
+  _consumeDirtyPaths(): string[] {
     const paths = [...this._dirtyPaths];
     this._dirtyPaths.clear();
     return paths;
@@ -2246,7 +2314,7 @@ export class ContextForge {
     return Math.max(1, Math.min(clamped, fileCount));
   }
 
-  _readRepositoryRow() {
+  _readRepositoryRow(): RepositoryRow | null {
     return this.db.prepare(`
       SELECT
         content_fingerprint AS contentFingerprint,
@@ -2269,8 +2337,8 @@ export class ContextForge {
     `).get(this.repoId) ?? null;
   }
 
-  _writeRepositoryRow(fields = {}) {
-    const current = this._readRepositoryRow() ?? {};
+  _writeRepositoryRow(fields: Partial<RepositoryRow> = {}) {
+    const current: RepositoryRow = this._readRepositoryRow() ?? {};
     const payload = {
       repoId: this.repoId,
       rootPath: this.rootDir,
@@ -2354,7 +2422,7 @@ export class ContextForge {
     `).run(payload);
   }
 
-  _buildIndexProgressSummary(row = this._readRepositoryRow(), counts = this._repoCounts()) {
+  _buildIndexProgressSummary(row: RepositoryRow | null = this._readRepositoryRow(), counts: RepoCounts = this._repoCounts()) {
     const contentCoverage = this._buildIndexedMemoryCoverage(row);
     return {
       repoId: this.repoId,
@@ -2372,7 +2440,7 @@ export class ContextForge {
     };
   }
 
-  _buildIndexedMemoryCoverage(row = this._readRepositoryRow()) {
+  _buildIndexedMemoryCoverage(row: RepositoryRow | null = this._readRepositoryRow()) {
     const metrics = this.db.prepare(`
       SELECT
         COUNT(*) AS filesIndexed,
@@ -2627,7 +2695,7 @@ export class ContextForge {
     }
   }
 
-  _repoCounts() {
+  _repoCounts(): RepoCounts {
     return {
       filesIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM files WHERE repo_id = ?`).get(this.repoId).count,
       symbolsIndexed: this.db.prepare(`SELECT COUNT(*) AS count FROM symbols WHERE repo_id = ?`).get(this.repoId).count,
@@ -2642,7 +2710,7 @@ export class ContextForge {
     return packageInfo?.name ?? path.basename(this.rootDir);
   }
 
-  _registerIndexedRepo(summary = {}) {
+  _registerIndexedRepo(summary: Record<string, any> = {}) {
     try {
       registerIndexedRepository({
         name: this._repoDisplayName(),
@@ -2660,7 +2728,7 @@ export class ContextForge {
     }
   }
 
-  _publicRegisteredRepo(repo = {}) {
+  _publicRegisteredRepo(repo: RegisteredRepoSummary = {}) {
     return {
       name: repo.name,
       repoId: repo.repoId,
@@ -3045,7 +3113,7 @@ export class ContextForge {
     return this._repoAudit;
   }
 
-  _syncChangedPaths(paths, { reason = "sync" } = {}) {
+  _syncChangedPaths(paths: Array<string | null | undefined>, { reason = "sync" }: Record<string, any> = {}) {
     if (this._inventoryDirty) {
       this._inventoryDirty = false;
       return {
@@ -3062,7 +3130,7 @@ export class ContextForge {
       .filter((entry) => {
         const segments = entry.split("/");
         return !segments.some((segment) => DEFAULT_FILE_OP_IGNORES.has(segment));
-      }));
+      })) as string[];
 
     if (!normalizedPaths.length) {
       return {
@@ -3133,7 +3201,7 @@ export class ContextForge {
       };
     } catch (error) {
       this.db.exec("ROLLBACK");
-      this._dirtyPaths = new Set([...this._dirtyPaths, ...normalizedPaths]);
+      this._dirtyPaths = new Set<string>([...this._dirtyPaths, ...normalizedPaths]);
       throw error;
     }
   }
@@ -3148,7 +3216,7 @@ export class ContextForge {
     return this._computeQuickRepoStamp(inventory);
   }
 
-  _resolveWorkspacePath(targetPath, options = {}) {
+  _resolveWorkspacePath(targetPath: string, options: Record<string, any> = {}) {
     const input = String(targetPath ?? "").trim();
     if (!input) {
       throw new Error("A path is required.");
@@ -3851,7 +3919,7 @@ export class ContextForge {
   }
 }
 
-export function createContextForge(rootDir, options = {}) {
+export function createContextForge(rootDir: string, options: Record<string, any> = {}) {
   return new ContextForge(rootDir, options);
 }
 
@@ -4238,10 +4306,10 @@ function intersectsAnyLineRange(symbol, ranges) {
   return ranges.some((range) => symbol.startLine <= range.end && symbol.endLine >= range.start);
 }
 
-function summarizeContracts({ files, symbols, edges }) {
-  const fileById = new Map(files.map((file) => [file.fileId, file]));
-  const symbolById = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
-  const contracts = new Map();
+function summarizeContracts({ files, symbols, edges }: { files: any[]; symbols: any[]; edges: any[] }) {
+  const fileById = new Map<string, any>(files.map((file) => [file.fileId, file]));
+  const symbolById = new Map<string, any>(symbols.map((symbol) => [symbol.symbolId, symbol]));
+  const contracts = new Map<string, { from: string; to: string; edgeTypes: Set<string>; files: Set<string>; symbols: Set<string> }>();
 
   for (const edge of edges) {
     if (!["call", "import", "data", "control"].includes(edge.edgeType)) {
@@ -4277,6 +4345,9 @@ function summarizeContracts({ files, symbols, edges }) {
     }
 
     const contract = contracts.get(key);
+    if (!contract) {
+      continue;
+    }
     contract.edgeTypes.add(edge.edgeType);
     contract.files.add(fromFile.relativePath);
     contract.files.add(toFile.relativePath);
@@ -4378,7 +4449,7 @@ function summarizeRoleBreakdown(fileDigests, limit = 6) {
     .slice(0, limit);
 }
 
-function inferFileRole(relativePath, content, language, file, options = {}) {
+function inferFileRole(relativePath: string, content: string, language: string, file: any, options: Record<string, any> = {}) {
   const loweredPath = String(relativePath ?? "").toLowerCase();
   const basename = path.basename(loweredPath);
 

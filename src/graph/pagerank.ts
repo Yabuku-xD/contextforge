@@ -1,18 +1,18 @@
-export function personalizedPageRank({ nodes, edges, seeds, alpha = 0.15, iterations = 20 }) {
-  const nodeIds = nodes.map((node) => node.id);
-  const out = new Map(nodeIds.map((id) => [id, []]));
-  const seedSet = new Set(seeds);
+export function personalizedPageRank({ nodes, edges, seeds, alpha = 0.15, iterations = 20 }: any): Array<{ id: string; score: number }> {
+  const nodeIds: string[] = nodes.map((node: any) => node.id);
+  const out = new Map<string, Array<{ to: string; weight: number }>>(nodeIds.map((id) => [id, []]));
+  const seedSet = new Set<string>(seeds);
 
   for (const edge of edges) {
     if (!out.has(edge.fromSymbolId)) {
       out.set(edge.fromSymbolId, []);
     }
-    out.get(edge.fromSymbolId).push({ to: edge.toSymbolId, weight: edge.confidence ?? 1 });
+    out.get(edge.fromSymbolId)?.push({ to: edge.toSymbolId, weight: edge.confidence ?? 1 });
   }
 
-  let scores = new Map(nodeIds.map((id) => [id, seedSet.has(id) ? 1 / Math.max(seedSet.size, 1) : 0]));
+  let scores = new Map<string, number>(nodeIds.map((id) => [id, seedSet.has(id) ? 1 / Math.max(seedSet.size, 1) : 0]));
   for (let i = 0; i < iterations; i += 1) {
-    const next = new Map(nodeIds.map((id) => [id, alpha * (seedSet.has(id) ? 1 / Math.max(seedSet.size, 1) : 0)]));
+    const next = new Map<string, number>(nodeIds.map((id) => [id, alpha * (seedSet.has(id) ? 1 / Math.max(seedSet.size, 1) : 0)]));
     for (const id of nodeIds) {
       const outgoing = out.get(id) ?? [];
       if (!outgoing.length) {

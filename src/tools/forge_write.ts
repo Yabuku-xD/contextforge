@@ -6,7 +6,7 @@ export const forgeWriteTool = {
     content: "string",
     create_dirs: "boolean?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.write(args.path ?? "", args.content ?? "", {
       createDirs: args.create_dirs
     });

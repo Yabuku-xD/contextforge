@@ -5,7 +5,7 @@ import { resolveProjectPath } from "./utils/runtime-paths.js";
 
 const BENCH_ROOT = resolveProjectPath(import.meta.url, "benchmark");
 
-const OPEN_TRACK_SPECS = {
+const OPEN_TRACK_SPECS: Record<string, any> = {
   context_mode: {
     track: "open-track",
     source: "external_import",
@@ -30,7 +30,7 @@ const OPEN_TRACK_SPECS = {
   }
 };
 
-const CLOSED_TRACK_SPECS = {};
+const CLOSED_TRACK_SPECS: Record<string, any> = {};
 
 const REPORT_SPECS = {
   ...OPEN_TRACK_SPECS,
@@ -65,7 +65,7 @@ export function reportInventory() {
   };
 }
 
-function inventoryFor(specs) {
+function inventoryFor(specs: Record<string, any>) {
   return Object.entries(specs).map(([name, spec]) => {
     const filePath = reportPath(name, spec.track);
     const present = exists(filePath);
@@ -90,7 +90,7 @@ function inventoryFor(specs) {
         filePath,
         source: report.source
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         name,
         track: spec.track,
@@ -117,15 +117,15 @@ function loadReportFromBench(name, spec) {
   return validateReportObject(parsed, name, spec, filePath);
 }
 
-function reportPath(name, track) {
+function reportPath(name: string, track: string) {
   return path.join(BENCH_ROOT, track, `${name}.report.json`);
 }
 
-function baselineNameFromPath(filePath) {
+function baselineNameFromPath(filePath: string) {
   return path.basename(filePath).replace(/\.report\.json$/u, "");
 }
 
-function validateReportObject(report, expectedName, spec, sourcePath) {
+function validateReportObject(report: any, expectedName: string, spec: any, sourcePath: string) {
   const object = asObject(report, sourcePath);
   const name = String(object.name ?? expectedName);
 
@@ -144,7 +144,7 @@ function validateReportObject(report, expectedName, spec, sourcePath) {
   };
 }
 
-function validateSummary(summary, suites, sourcePath) {
+function validateSummary(summary: any, suites: Record<string, any>, sourcePath: string) {
   const object = asObject(summary, `${sourcePath}#summary`);
   return Object.fromEntries(
     Object.entries(suites).map(([suiteName, keys]) => {
@@ -157,7 +157,7 @@ function validateSummary(summary, suites, sourcePath) {
   );
 }
 
-function asObject(value, label) {
+function asObject(value: any, label: string): Record<string, any> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
@@ -165,7 +165,7 @@ function asObject(value, label) {
   return value;
 }
 
-function numericOrNull(value, label) {
+function numericOrNull(value: any, label: string) {
   if (value == null) {
     return null;
   }

@@ -7,7 +7,7 @@ export const forgeEditTool = {
     new_text: "string",
     replace_all: "boolean?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.edit(args.path ?? "", args.old_text ?? "", args.new_text ?? "", {
       replaceAll: args.replace_all
     });

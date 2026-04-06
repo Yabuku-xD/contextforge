@@ -4,7 +4,7 @@ export const forgeContractsTool = {
   parameters: {
     query: "string?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.contracts(args.query ?? "");
   }
 };

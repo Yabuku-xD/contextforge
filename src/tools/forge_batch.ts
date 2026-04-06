@@ -9,7 +9,7 @@ export const forgeBatchTool = {
     timeout_ms: "number?",
     max_chars: "number?"
   },
-  async execute(forge, args = {}) {
+  async execute(forge: any, args: any = {}) {
     return forge.batch(args.commands, {
       queries: args.queries,
       cwd: args.cwd,

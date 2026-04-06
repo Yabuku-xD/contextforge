@@ -4,7 +4,7 @@ export const forgeGetTool = {
   parameters: {
     tool_name: "string | 'list'"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     const toolName = args.tool_name ?? "list";
     if (toolName === "list") {
       return forge.listTools().map((name) => ({ name }));

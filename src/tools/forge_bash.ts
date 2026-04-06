@@ -7,7 +7,7 @@ export const forgeBashTool = {
     timeout_ms: "number?",
     max_chars: "number?"
   },
-  async execute(forge, args = {}) {
+  async execute(forge: any, args: any = {}) {
     return forge.bash(args.command ?? "", {
       cwd: args.cwd,
       timeoutMs: args.timeout_ms,

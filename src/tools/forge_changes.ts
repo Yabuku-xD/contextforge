@@ -5,7 +5,7 @@ export const forgeChangesTool = {
     scope: "string?",
     base_ref: "string?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.changes({
       scope: args.scope,
       baseRef: args.base_ref

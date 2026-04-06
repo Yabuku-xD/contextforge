@@ -1,7 +1,7 @@
 import { createContextForge } from "../src/contextforge.js";
 import { rememberActiveSession, resolveRuntimeSessionId } from "../src/session/runtime.js";
 
-export function sessionStart(rootDir, message, options = {}) {
+export function sessionStart(rootDir: string, message: string, options: Record<string, any> = {}) {
   const sessionId = resolveRuntimeSessionId(rootDir, {
     sessionId: options.sessionId,
     preferActive: false

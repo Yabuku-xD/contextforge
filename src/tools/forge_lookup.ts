@@ -6,7 +6,7 @@ export const forgeLookupTool = {
     source_id: "string?",
     limit: "number?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.lookup(args.queries, {
       sourceId: args.source_id,
       limit: args.limit

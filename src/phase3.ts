@@ -36,7 +36,8 @@ export async function runSweBenchSubset(rootDir) {
     await runContextForgeBaseline(rootDir, tasks, "swebenchSubset"),
     runBareBaseline(rootDir, tasks, "swebenchSubset")
   ];
-  const summary = summarizeComparableTrack(baselines, "swebenchSubset");
+  const summary: any = summarizeComparableTrack(baselines, "swebenchSubset");
+  const contextforgeBaseline: any = baselines.find((baseline) => baseline.name === "contextforge");
 
   return {
     rootDir: path.resolve(rootDir),
@@ -47,7 +48,7 @@ export async function runSweBenchSubset(rootDir) {
     gates: {
       overallStatus: summary.winner?.name === "contextforge" ? "pass" : "fail",
       bestBaseline: summary.winner?.name ?? null,
-      contextforgeValue: baselines.find((baseline) => baseline.name === "contextforge")?.summary?.swebenchSubset?.tokensPerSuccessfulTask ?? null
+      contextforgeValue: contextforgeBaseline?.summary?.swebenchSubset?.tokensPerSuccessfulTask ?? null
     }
   };
 }
@@ -269,7 +270,7 @@ function injectSessionEvents(forge, events) {
   }
 }
 
-function normalizeListOutput(items, extra = {}) {
+function normalizeListOutput(items: any[], extra: Record<string, any> = {}): any {
   const labels = items.map((item) => item.label).filter(Boolean);
   return {
     labels,
@@ -278,6 +279,13 @@ function normalizeListOutput(items, extra = {}) {
     filesRead: unique(items.map((item) => item.fileRef).filter(Boolean)).length,
     rawTokens: sum(items.map((item) => estimateTokens(item.label)))
   };
+}
+
+interface BareWorkflowRunner {
+  rootDir: string;
+  files: any[];
+  symbols: any[];
+  sessionEvents: any[];
 }
 
 function normalizeStructuredOutput(result) {

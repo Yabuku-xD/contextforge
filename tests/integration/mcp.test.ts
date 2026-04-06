@@ -8,6 +8,11 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
 
+function textContent(resource: { contents: Array<{ text?: string; blob?: string }> }) {
+  const [first] = resource.contents ?? [];
+  return "text" in (first ?? {}) ? String(first?.text ?? "") : "";
+}
+
 test("mcp server exposes ContextForge tools over stdio", async () => {
   const client = new Client({ name: "contextforge-test-client", version: "1.0.0" }, { capabilities: {} });
   const transport = new StdioClientTransport({
@@ -54,7 +59,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     const overviewResource = await client.readResource({
       uri: "contextforge://repo/overview"
     });
-    assert.match(overviewResource.contents[0].text, /importantFiles|topLevel/i);
+    assert.match(textContent(overviewResource), /importantFiles|topLevel/i);
 
     const generatedMapPath = path.join(sampleRepo, ".contextforge", "generated", "map.md");
     const generatedContractsPath = path.join(sampleRepo, ".contextforge", "generated", "contracts.md");
@@ -64,13 +69,13 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     const mapResource = await client.readResource({
       uri: "contextforge://repo/map"
     });
-    assert.match(mapResource.contents[0].text, /"persisted":\s*false/);
+    assert.match(textContent(mapResource), /"persisted":\s*false/);
     assert.equal(fs.existsSync(generatedMapPath), false);
 
     const contractsResource = await client.readResource({
       uri: "contextforge://repo/contracts"
     });
-    assert.match(contractsResource.contents[0].text, /"persisted":\s*false/);
+    assert.match(textContent(contractsResource), /"persisted":\s*false/);
     assert.equal(fs.existsSync(generatedContractsPath), false);
 
     const scan = await client.callTool({
@@ -168,7 +173,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.match(batch.content[0].text, /receipt_first/);
     assert.match(batch.content[0].text, /contextSavings/);
 
-    const batchPayload = batch.structuredContent;
+    const batchPayload: any = batch.structuredContent;
     const lookup = await client.callTool({
       name: "forge_lookup",
       arguments: {

@@ -1,4 +1,4 @@
-const SYNONYM_GROUPS = [
+const SYNONYM_GROUPS: string[][] = [
   ["auth", "authentication", "credential", "credentials", "login"],
   ["token", "session", "cookie"],
   ["retry", "backoff", "retriable"],
@@ -9,8 +9,8 @@ const SYNONYM_GROUPS = [
 
 const SYNONYM_MAP = buildSynonymMap();
 
-export function resolveAliasSeeds(query, symbols, limit = 5) {
-  const directTokens = new Set(aliasTokens(query));
+export function resolveAliasSeeds(query: string, symbols: any[], limit = 5): string[] {
+  const directTokens = new Set<string>(aliasTokens(query));
   const expandedTokens = expandAliasTokens(directTokens);
   if (!expandedTokens.size) {
     return [];
@@ -27,7 +27,7 @@ export function resolveAliasSeeds(query, symbols, limit = 5) {
     .map((entry) => entry.symbolId);
 }
 
-export function scoreAliasCandidate(queryShape, symbol) {
+export function scoreAliasCandidate(queryShape: { directTokens: Set<string>; expandedTokens: Set<string> }, symbol: any) {
   const { directTokens, expandedTokens } = queryShape;
   const symbolTokens = expandAliasTokens(aliasTokens(`${symbol.displayName} ${symbol.canonicalName}`));
   if (!symbolTokens.size) {
@@ -46,7 +46,7 @@ export function scoreAliasCandidate(queryShape, symbol) {
   return score / Math.max(directTokens.size || expandedTokens.size, 1);
 }
 
-function aliasTokens(value) {
+function aliasTokens(value: string) {
   return String(value ?? "")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[/:._-]+/g, " ")
@@ -56,8 +56,8 @@ function aliasTokens(value) {
     .flatMap((token) => token.endsWith("s") && token.length > 4 ? [token, token.slice(0, -1)] : [token]);
 }
 
-function expandAliasTokens(tokens) {
-  const expanded = new Set();
+function expandAliasTokens(tokens: Iterable<string>) {
+  const expanded = new Set<string>();
   for (const token of tokens) {
     expanded.add(token);
     for (const alias of SYNONYM_MAP.get(token) ?? []) {
@@ -68,7 +68,7 @@ function expandAliasTokens(tokens) {
 }
 
 function buildSynonymMap() {
-  const map = new Map();
+  const map = new Map<string, Set<string>>();
   for (const group of SYNONYM_GROUPS) {
     for (const token of group) {
       map.set(token, new Set(group.filter((candidate) => candidate !== token)));

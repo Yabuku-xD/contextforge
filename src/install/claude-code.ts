@@ -21,7 +21,14 @@ const MUTATING_TOOL_NAMES = new Set([
   "forge_wiki"
 ]);
 
-export function installClaudeCodeProject(targetDir = process.cwd(), options = {}) {
+type ClaudeInstallOptions = {
+  serverName?: string;
+  rootArg?: string;
+  allowMutations?: boolean;
+  dontAsk?: boolean;
+};
+
+export function installClaudeCodeProject(targetDir = process.cwd(), options: ClaudeInstallOptions = {}) {
   const resolvedTarget = path.resolve(targetDir);
   const configPath = path.join(resolvedTarget, ".mcp.json");
   const serverName = options.serverName ?? DEFAULT_SERVER_NAME;
@@ -69,7 +76,7 @@ export function buildClaudeCodeServerEntry(rootArg = ".") {
   };
 }
 
-function parseConfig(configPath) {
+function parseConfig(configPath: string) {
   try {
     return JSON.parse(readText(configPath));
   } catch (error) {
@@ -77,11 +84,11 @@ function parseConfig(configPath) {
   }
 }
 
-function sameEntry(left, right) {
+function sameEntry(left: any, right: any) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function mergeClaudeCodePermissions(targetDir = process.cwd(), options = {}) {
+export function mergeClaudeCodePermissions(targetDir = process.cwd(), options: ClaudeInstallOptions = {}) {
   const resolvedTarget = path.resolve(targetDir);
   const settingsDir = path.join(resolvedTarget, ".claude");
   const configPath = path.join(settingsDir, "settings.local.json");
@@ -129,7 +136,7 @@ export function mergeClaudeCodePermissions(targetDir = process.cwd(), options = 
   };
 }
 
-export function syncClaudeCodePermissions(startDir = process.cwd(), options = {}) {
+export function syncClaudeCodePermissions(startDir = process.cwd(), options: ClaudeInstallOptions = {}) {
   const targets = findClaudeProjectTargets(startDir);
   return targets.map((targetDir) => mergeClaudeCodePermissions(targetDir, options));
 }
@@ -173,7 +180,7 @@ export function findClaudeProjectTargets(startDir = process.cwd()) {
   return [];
 }
 
-function buildAllowedPermissionEntries(serverName, options = {}) {
+function buildAllowedPermissionEntries(serverName: string, options: ClaudeInstallOptions = {}) {
   const localPrefix = `mcp__${sanitizeServerName(serverName)}__`;
   const toolNames = Object.values(TOOL_REGISTRY)
     .map((tool) => tool.name)
@@ -188,11 +195,11 @@ function buildAllowedPermissionEntries(serverName, options = {}) {
   return [...permissions];
 }
 
-function hasProjectMarker(targetDir, markers) {
+function hasProjectMarker(targetDir: string, markers: string[]) {
   return markers.some((entry) => exists(path.join(targetDir, entry)));
 }
 
-function sanitizeServerName(serverName) {
+function sanitizeServerName(serverName: string) {
   return String(serverName ?? DEFAULT_SERVER_NAME)
     .trim()
     .replace(/[^A-Za-z0-9_]/g, "_");

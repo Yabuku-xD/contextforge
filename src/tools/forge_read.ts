@@ -8,7 +8,7 @@ export const forgeReadTool = {
     max_lines: "number?",
     limit: "number?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.read(args.path ?? "", {
       startLine: args.start_line,
       endLine: args.end_line,

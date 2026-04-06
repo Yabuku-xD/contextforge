@@ -2,7 +2,7 @@ import { personalizedPageRank } from "./pagerank.js";
 import { resolveAliasSeeds } from "./alias-resolution.js";
 import { tokenize } from "../utils/text.js";
 
-export function rerankWithGraph({ query, results, repoGraph, symbols }) {
+export function rerankWithGraph({ query, results, repoGraph, symbols }: any) {
   const seeds = resolveAliasSeeds(query, symbols, 6);
   if (!seeds.length) {
     return results;
@@ -29,8 +29,8 @@ export function rerankWithGraph({ query, results, repoGraph, symbols }) {
     .sort((left, right) => right.finalScore - left.finalScore);
 }
 
-function lexicalOverlap(label, query) {
-  const labelTokens = new Set(tokenize(label));
+function lexicalOverlap(label: string, query: string) {
+  const labelTokens = new Set<string>(tokenize(label));
   const queryTokens = tokenize(query);
   let matches = 0;
   for (const token of queryTokens) {

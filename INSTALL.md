@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.39`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.40`.
 
 ## What This Guide Covers
 
@@ -20,6 +20,7 @@ This document is the technical companion to the main README. Use it when you wan
 - Claude Code for the marketplace plugin flow
 
 ContextForge bootstraps its runtime automatically and stores cached runtime assets under `~/.contextforge/runtime/`.
+The repository itself is now compiler-checked TypeScript, so local development can use both `npm run build` and `npm run typecheck`.
 
 ## 1. Claude Code Marketplace Install
 

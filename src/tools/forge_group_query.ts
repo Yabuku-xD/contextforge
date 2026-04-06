@@ -6,7 +6,7 @@ export const forgeGroupQueryTool = {
     query: "string",
     limit: "number?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.groupQuery(args.group_name ?? "", args.query ?? "", {
       limit: normalizeLimit(args.limit)
     });

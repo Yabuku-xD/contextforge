@@ -4,7 +4,7 @@ export const forgeMapTool = {
   parameters: {
     query: "string?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.map(args.query ?? "");
   }
 };

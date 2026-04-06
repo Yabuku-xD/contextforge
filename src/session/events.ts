@@ -1,7 +1,10 @@
 import { makeSessionEvent, buildSessionEdges } from "../graph/session-graph.js";
 import { redactSecrets } from "./redaction.js";
 
-export function recordSessionEvent(db, { repoId, sessionId, eventType, payload, confidence = 1 }) {
+export function recordSessionEvent(
+  db: any,
+  { repoId, sessionId, eventType, payload, confidence = 1 }: Record<string, any>
+) {
   const safePayload = JSON.parse(JSON.stringify(payload ?? {}));
   for (const key of Object.keys(safePayload)) {
     if (typeof safePayload[key] === "string") {
@@ -43,7 +46,7 @@ export function recordSessionEvent(db, { repoId, sessionId, eventType, payload, 
   return event;
 }
 
-export function listSessionEvents(db, sessionId, repoId) {
+export function listSessionEvents(db: any, sessionId: string, repoId: string): any[] {
   return db.prepare(`
     SELECT event_id AS eventId, repo_id AS repoId, session_id AS sessionId, event_type AS eventType,
            payload_json AS payloadJson, confidence, created_at AS createdAt
@@ -56,7 +59,7 @@ export function listSessionEvents(db, sessionId, repoId) {
   }));
 }
 
-function isDatabaseLockError(error) {
+function isDatabaseLockError(error: any) {
   return error?.errcode === 5 ||
     (error?.code === "ERR_SQLITE_ERROR" && /database is locked/i.test(String(error?.message ?? "")));
 }

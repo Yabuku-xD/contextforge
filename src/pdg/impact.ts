@@ -1,6 +1,6 @@
 const IMPACT_EDGE_TYPES = new Set(["call", "control", "data", "import"]);
 
-export function computeImpact(seedSymbolId, allEdges, options = {}) {
+export function computeImpact(seedSymbolId: string, allEdges: any[], options: Record<string, any> = {}) {
   const maxDepth = options.maxDepth ?? 4;
   const minScore = options.minScore ?? 0.18;
   const relevant = allEdges.filter((edge) => IMPACT_EDGE_TYPES.has(edge.edgeType));
@@ -44,7 +44,7 @@ export function computeImpact(seedSymbolId, allEdges, options = {}) {
     .map(([symbolId]) => symbolId);
 }
 
-function pushEdge(adjacency, from, to, weight) {
+function pushEdge(adjacency: Map<string, any[]>, from: string, to: string, weight: number) {
   if (!adjacency.has(from)) {
     adjacency.set(from, []);
   }
@@ -52,7 +52,7 @@ function pushEdge(adjacency, from, to, weight) {
   adjacency.get(from).push({ to, weight });
 }
 
-function reversePenalty(edgeType) {
+function reversePenalty(edgeType: string) {
   if (edgeType === "control") return 0.55;
   if (edgeType === "data") return 0.75;
   return 0.85;

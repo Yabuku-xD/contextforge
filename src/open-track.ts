@@ -442,7 +442,7 @@ function injectSessionEvents(forge, events) {
   }
 }
 
-function normalizeListOutput(items, extra = {}) {
+function normalizeListOutput(items: any[], extra: Record<string, any> = {}): any {
   const labels = items.map((item) => item.label).filter(Boolean);
   return {
     labels,
@@ -451,6 +451,13 @@ function normalizeListOutput(items, extra = {}) {
     filesRead: unique(items.map((item) => item.fileRef).filter(Boolean)).length,
     rawTokens: sum(items.map((item) => estimateTokens(item.label)))
   };
+}
+
+interface BareWorkflowRunner {
+  rootDir: string;
+  files: any[];
+  symbols: any[];
+  sessionEvents: any[];
 }
 
 function normalizeStructuredOutput(result) {

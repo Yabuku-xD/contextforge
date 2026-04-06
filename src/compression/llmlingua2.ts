@@ -6,7 +6,7 @@ export async function loadLLMLingua2() {
   }
 
   try {
-    const module = await import("@atjsh/llmlingua-2");
+    const module: any = await import("@atjsh/llmlingua-2");
     LLMLingua2 = module.LLMLingua2 ?? module.default ?? null;
   } catch {
     LLMLingua2 = null;
@@ -15,7 +15,7 @@ export async function loadLLMLingua2() {
   return LLMLingua2;
 }
 
-export async function compressWithLLMLingua2(text, options = {}) {
+export async function compressWithLLMLingua2(text: string, options: Record<string, any> = {}) {
   const Implementation = await loadLLMLingua2();
   if (!Implementation) {
     return null;

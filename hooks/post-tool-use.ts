@@ -2,7 +2,7 @@ import { createContextForge } from "../src/contextforge.js";
 import { recordSessionEvent } from "../src/session/events.js";
 import { rememberActiveSession, resolveRuntimeSessionId } from "../src/session/runtime.js";
 
-export function postToolUse(rootDir, eventType, payload = {}, options = {}) {
+export function postToolUse(rootDir: string, eventType: string, payload: Record<string, any> = {}, options: Record<string, any> = {}) {
   const sessionId = resolveRuntimeSessionId(rootDir, {
     sessionId: options.sessionId,
     preferActive: true

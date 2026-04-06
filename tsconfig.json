@@ -5,10 +5,8 @@
     "moduleResolution": "NodeNext",
     "rootDir": ".",
     "outDir": "dist",
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "strict": false,
-    "noCheck": true,
     "noEmitOnError": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
@@ -16,11 +14,8 @@
     "types": ["node"]
   },
   "include": [
-    "src/**/*.js",
     "src/**/*.ts",
-    "hooks/**/*.js",
     "hooks/**/*.ts",
-    "tests/**/*.js",
     "tests/**/*.ts",
     ".claude-plugin/**/*.ts"
   ],

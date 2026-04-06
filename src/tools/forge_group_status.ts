@@ -4,7 +4,7 @@ export const forgeGroupStatusTool = {
   parameters: {
     group_name: "string"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.groupStatus(args.group_name ?? "");
   }
 };

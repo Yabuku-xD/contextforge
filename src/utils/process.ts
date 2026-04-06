@@ -7,13 +7,13 @@ export async function runShellCommand({
   maxCaptureChars = Number.POSITIVE_INFINITY,
   onStdoutChunk = null,
   onStderrChunk = null
-}) {
+}: Record<string, any>): Promise<any> {
   const shell = process.env.SHELL || "/bin/sh";
   const captureLimit = Number.isFinite(maxCaptureChars)
     ? Math.max(0, maxCaptureChars)
     : Number.POSITIVE_INFINITY;
 
-  return new Promise((resolve) => {
+  return new Promise<any>((resolve) => {
     const child = spawn(shell, ["-lc", command], {
       cwd,
       env: process.env,
@@ -25,7 +25,7 @@ export async function runShellCommand({
     let timedOut = false;
     let settled = false;
 
-    const finish = (result) => {
+    const finish = (result: any) => {
       if (settled) {
         return;
       }

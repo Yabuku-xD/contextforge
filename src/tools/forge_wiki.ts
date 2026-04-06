@@ -4,7 +4,7 @@ export const forgeWikiTool = {
   parameters: {
     query: "string?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.wiki(args.query ?? "");
   }
 };

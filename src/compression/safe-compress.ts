@@ -2,7 +2,7 @@ import { COMPRESSION_PRESETS } from "./presets.js";
 import { compressWithLLMLingua2 } from "./llmlingua2.js";
 import { runFidelityChecks } from "./fidelity-checks.js";
 
-export async function safeCompress(content, { contentType, preferModel = false } = {}) {
+export async function safeCompress(content: string, { contentType, preferModel = false }: Record<string, any> = {}) {
   const text = String(content ?? "");
   const preset = COMPRESSION_PRESETS[contentType] ?? COMPRESSION_PRESETS.plain_text;
   const targetToken = Math.max(64, Math.floor(estimateTokens(text) * preset.ratio));

@@ -6,7 +6,7 @@ export const forgeRenameTool = {
     new_name: "string",
     dry_run: "boolean?"
   },
-  execute(forge, args = {}) {
+  execute(forge: any, args: any = {}) {
     return forge.rename(args.symbol_query ?? "", args.new_name ?? "", {
       dryRun: args.dry_run
     });

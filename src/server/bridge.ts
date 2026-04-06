@@ -2,7 +2,7 @@ import http from "node:http";
 import { URL } from "node:url";
 import { createContextForge } from "../contextforge.js";
 
-export async function startBridgeServer(rootDir, options = {}) {
+export async function startBridgeServer(rootDir: string, options: Record<string, any> = {}) {
   const host = options.host ?? "127.0.0.1";
   const port = normalizePort(options.port);
   const forge = createContextForge(rootDir, options.sessionId ? { sessionId: options.sessionId } : {});
@@ -19,7 +19,7 @@ export async function startBridgeServer(rootDir, options = {}) {
     }
   });
 
-  await new Promise((resolve) => server.listen(port, host, resolve));
+  await new Promise<void>((resolve) => server.listen(port, host, () => resolve()));
   const address = server.address();
   const resolvedPort = typeof address === "object" && address ? address.port : port;
 
@@ -27,7 +27,7 @@ export async function startBridgeServer(rootDir, options = {}) {
     host,
     port: resolvedPort,
     url: `http://${host}:${resolvedPort}`,
-    close: () => new Promise((resolve, reject) => {
+    close: () => new Promise<void>((resolve, reject) => {
       server.close((error) => {
         forge.close();
         if (error) {

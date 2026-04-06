@@ -31,10 +31,10 @@ export async function runScoreboard(rootDir) {
     name: baseline.name,
     available: baseline.available,
     source: baseline.source,
-    successRate: baseline.summary?.swebenchSubset?.successRate ?? null,
-    tokensPerSuccessfulTask: baseline.summary?.swebenchSubset?.tokensPerSuccessfulTask ?? null,
-    filesReadPerSuccessfulTask: baseline.summary?.swebenchSubset?.filesReadPerSuccessfulTask ?? null,
-    avgLatencyMs: baseline.summary?.swebenchSubset?.avgLatencyMs ?? null
+    successRate: (baseline.summary as any)?.swebenchSubset?.successRate ?? null,
+    tokensPerSuccessfulTask: (baseline.summary as any)?.swebenchSubset?.tokensPerSuccessfulTask ?? null,
+    filesReadPerSuccessfulTask: (baseline.summary as any)?.swebenchSubset?.filesReadPerSuccessfulTask ?? null,
+    avgLatencyMs: (baseline.summary as any)?.swebenchSubset?.avgLatencyMs ?? null
   }));
 
   const closedRows = closedTrack.baselines.map((baseline) => ({
@@ -43,8 +43,8 @@ export async function runScoreboard(rootDir) {
     source: baseline.source,
     localVerifiedSuccess: baseline.summary?.localVerified?.successRate ?? null,
     localVerifiedTokens: baseline.summary?.localVerified?.tokensPerSuccessfulTask ?? null,
-    swebenchSuccess: baseline.summary?.swebenchSubset?.successRate ?? null,
-    swebenchTokens: baseline.summary?.swebenchSubset?.tokensPerSuccessfulTask ?? null
+    swebenchSuccess: (baseline.summary as any)?.swebenchSubset?.successRate ?? null,
+    swebenchTokens: (baseline.summary as any)?.swebenchSubset?.tokensPerSuccessfulTask ?? null
   }));
 
   return {

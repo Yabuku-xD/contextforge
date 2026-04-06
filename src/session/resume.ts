@@ -3,7 +3,10 @@ import { listSessionEvents } from "./events.js";
 
 const DEFAULT_EXCLUDED_EVENT_TYPES = new Set(["index", "index_reuse", "startup"]);
 
-export function buildResumeSummary(db, { repoId, sessionId, maxEvents = 10, excludeEventTypes = DEFAULT_EXCLUDED_EVENT_TYPES } = {}) {
+export function buildResumeSummary(
+  db: any,
+  { repoId, sessionId, maxEvents = 10, excludeEventTypes = DEFAULT_EXCLUDED_EVENT_TYPES }: Record<string, any> = {}
+) {
   const events = listSessionEvents(db, sessionId, repoId)
     .filter((event) => !excludeEventTypes.has(event.eventType))
     .slice(-maxEvents);
