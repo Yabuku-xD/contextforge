@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/pretooluse.js"
           }
         ]
       },
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/pretooluse.js"
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/pretooluse.js"
           }
         ]
       },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/pretooluse.js"
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/pretooluse.js"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart.mjs"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/dist/hooks/sessionstart.js"
           }
         ]
       }

@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.33`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.39`.
 
 ## What This Guide Covers
 
@@ -48,13 +48,13 @@ This marketplace installs directly from GitHub. No separate npm publish step is 
 If you use the local installer from a checkout, the safe default is:
 
 ```bash
-node ./src/cli.js install-claude .
+node ./dist/src/cli.js install-claude .
 ```
 
 That seeds read/search-style ContextForge tools in `.claude/settings.local.json` without silently auto-approving mutation or shell tools. ContextForge also re-checks this safe allowlist when the plugin boots in a project so `dontAsk` mode does not accidentally hard-deny `forge_start` or other read-only tools. If you explicitly want ContextForge writes, edits, bash, and `dontAsk` mode seeded too:
 
 ```bash
-node ./src/cli.js install-claude . --allow-mutations --dont-ask
+node ./dist/src/cli.js install-claude . --allow-mutations --dont-ask
 ```
 
 ## 2. What Gets Installed
@@ -64,8 +64,8 @@ The plugin includes:
 - a Claude Code marketplace package in [.claude-plugin/plugin.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/plugin.json)
 - marketplace metadata in [.claude-plugin/marketplace.json](/Users/yabuku/Downloads/context-forge/.claude-plugin/marketplace.json)
 - a stdio MCP definition in [.mcp.json](/Users/yabuku/Downloads/context-forge/.mcp.json)
-- SessionStart routing guidance in [hooks/sessionstart.mjs](/Users/yabuku/Downloads/context-forge/hooks/sessionstart.mjs)
-- PreToolUse routing guards in [hooks/pretooluse.mjs](/Users/yabuku/Downloads/context-forge/hooks/pretooluse.mjs)
+- SessionStart routing guidance in [hooks/sessionstart.ts](/Users/yabuku/Downloads/context-forge/hooks/sessionstart.ts)
+- PreToolUse routing guards in [hooks/pretooluse.ts](/Users/yabuku/Downloads/context-forge/hooks/pretooluse.ts)
 
 After install, Claude can call ContextForge as:
 
@@ -144,11 +144,11 @@ npm test
 Useful local commands:
 
 ```bash
-node ./src/cli.js doctor .
-node ./src/cli.js release .
-node ./src/cli.js scoreboard .
-node ./src/cli.js understand "understand this repository" .
-node ./src/cli.js walk "go through every major area in this repository" .
+node ./dist/src/cli.js doctor .
+node ./dist/src/cli.js release .
+node ./dist/src/cli.js scoreboard .
+node ./dist/src/cli.js understand "understand this repository" .
+node ./dist/src/cli.js walk "go through every major area in this repository" .
 ```
 
 ## 6. Optional Global CLI Install
@@ -205,7 +205,7 @@ If you are running from a checkout instead of a global install:
   "mcpServers": {
     "contextforge": {
       "command": "node",
-      "args": ["/absolute/path/to/contextforge/src/mcp-server.js", "--root", "."],
+      "args": ["/absolute/path/to/contextforge/dist/src/mcp-server.js", "--root", "."],
       "env": {
         "CONTEXTFORGE_USE_ACTIVE_SESSION": "1"
       }
@@ -233,7 +233,7 @@ claude mcp add --transport stdio --scope project contextforge -- contextforge-mc
 Manual Claude Code install from a local checkout:
 
 ```bash
-claude mcp add --transport stdio --scope project contextforge -- node /absolute/path/to/contextforge/src/mcp-server.js --root .
+claude mcp add --transport stdio --scope project contextforge -- node /absolute/path/to/contextforge/dist/src/mcp-server.js --root .
 ```
 
 ## 9. Verify the Install

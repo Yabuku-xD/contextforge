@@ -5,9 +5,10 @@ import { loadRepositoryFiles } from "./indexing/files.js";
 import { loadOpenTrackReport } from "./reports.js";
 import { recordSessionEvent } from "./session/events.js";
 import { exists, readText } from "./utils/fs.js";
+import { resolveProjectPath } from "./utils/runtime-paths.js";
 import { estimateTokens, tokenize, unique, clip } from "./utils/text.js";
 
-const FIXTURE_ROOT = new URL("../benchmark/", import.meta.url);
+const FIXTURE_ROOT = resolveProjectPath(import.meta.url, "benchmark");
 const EXTERNAL_BASELINES = ["context_mode", "token_savior"];
 const BUILT_IN_BASELINES = ["bare_workflow", "contextforge"];
 const EPSILON = 1e-9;
@@ -64,7 +65,7 @@ function loadPhase3Fixtures() {
 }
 
 function loadFixture(relativePath) {
-  const filePath = new URL(relativePath, FIXTURE_ROOT);
+  const filePath = path.join(FIXTURE_ROOT, relativePath);
   return JSON.parse(readText(filePath));
 }
 

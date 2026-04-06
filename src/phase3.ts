@@ -6,9 +6,10 @@ import { runOpenTrack } from "./open-track.js";
 import { loadClosedTrackReport } from "./reports.js";
 import { recordSessionEvent } from "./session/events.js";
 import { exists, readText } from "./utils/fs.js";
+import { resolveProjectPath } from "./utils/runtime-paths.js";
 import { estimateTokens, tokenize, unique, clip } from "./utils/text.js";
 
-const BENCH_ROOT = new URL("../benchmark/", import.meta.url);
+const BENCH_ROOT = resolveProjectPath(import.meta.url, "benchmark");
 const CLOSED_BASELINES = [];
 const EPSILON = 1e-9;
 
@@ -102,7 +103,7 @@ export async function runClosedTrack(rootDir) {
 }
 
 function loadFixture(relativePath) {
-  return JSON.parse(readText(new URL(relativePath, BENCH_ROOT)));
+  return JSON.parse(readText(path.join(BENCH_ROOT, relativePath)));
 }
 
 function loadClosedBaselineReport(name) {

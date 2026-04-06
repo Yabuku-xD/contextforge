@@ -1,8 +1,9 @@
 import path from "node:path";
 
 import { exists, readText } from "./utils/fs.js";
+import { resolveProjectPath } from "./utils/runtime-paths.js";
 
-const BENCH_ROOT = new URL("../benchmark/", import.meta.url);
+const BENCH_ROOT = resolveProjectPath(import.meta.url, "benchmark");
 
 const OPEN_TRACK_SPECS = {
   context_mode: {
@@ -117,7 +118,7 @@ function loadReportFromBench(name, spec) {
 }
 
 function reportPath(name, track) {
-  return path.resolve(new URL(`${track}/${name}.report.json`, BENCH_ROOT).pathname);
+  return path.join(BENCH_ROOT, track, `${name}.report.json`);
 }
 
 function baselineNameFromPath(filePath) {

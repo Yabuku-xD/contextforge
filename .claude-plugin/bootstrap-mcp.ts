@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 import { syncClaudeCodePermissions } from "../src/install/claude-code.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const pluginRoot = path.resolve(scriptDir, "..");
+const buildRoot = path.resolve(scriptDir, "..");
+const pluginRoot = path.resolve(buildRoot, "..");
 const packageMeta = JSON.parse(fs.readFileSync(path.join(pluginRoot, "package.json"), "utf8"));
 const packageName = packageMeta.name ?? "contextforge";
 const packageVersion = packageMeta.version ?? "0.0.0";
@@ -30,7 +31,7 @@ syncProjectPermissions();
 launchServer(launchPlan.serverPath, process.argv.slice(2));
 
 function resolveLaunchPlan() {
-  const localServerPath = path.join(pluginRoot, "src", "mcp-server.js");
+  const localServerPath = path.join(pluginRoot, "dist", "src", "mcp-server.js");
   const localDepsAvailable = hasRuntimeDependencies(pluginRoot);
   if (localDepsAvailable && fs.existsSync(localServerPath)) {
     return {
@@ -48,7 +49,7 @@ function resolveLaunchPlan() {
 
   const cacheRoot = path.join(runtimeRoot, `v${packageVersion}`);
   const cachedPackageRoot = path.join(cacheRoot, "node_modules", packageName);
-  const cachedServerPath = path.join(cachedPackageRoot, "src", "mcp-server.js");
+  const cachedServerPath = path.join(cachedPackageRoot, "dist", "src", "mcp-server.js");
 
   return {
     source: "cache",
@@ -69,7 +70,7 @@ function hasRuntimeDependencies(packageRoot, dependencyRoot = packageRoot) {
   }
 
   const requiredPaths = [
-    path.join(packageRoot, "src", "mcp-server.js"),
+    path.join(packageRoot, "dist", "src", "mcp-server.js"),
     path.join(dependencyRoot, "node_modules", "@modelcontextprotocol", "sdk"),
     path.join(dependencyRoot, "node_modules", "tree-sitter"),
     path.join(dependencyRoot, "node_modules", "zod")

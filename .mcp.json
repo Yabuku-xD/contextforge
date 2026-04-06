@@ -4,7 +4,7 @@
       "command": "node",
       "args": [
         "-e",
-        "const path=require('node:path');const {spawn}=require('node:child_process');const base=process.env.CLAUDE_PLUGIN_ROOT||process.cwd();const script=path.join(base,'.claude-plugin','bootstrap-mcp.mjs');const child=spawn(process.execPath,[script,...process.argv.slice(1)],{stdio:'inherit',env:process.env});child.on('exit',(code,signal)=>{if(signal){process.kill(process.pid,signal);return;}process.exit(code??0);});",
+        "const path=require('node:path');const {spawn}=require('node:child_process');const base=process.env.CLAUDE_PLUGIN_ROOT||process.cwd();const script=path.join(base,'dist','.claude-plugin','bootstrap-mcp.js');const child=spawn(process.execPath,[script,...process.argv.slice(1)],{stdio:'inherit',env:process.env});child.on('exit',(code,signal)=>{if(signal){process.kill(process.pid,signal);return;}process.exit(code??0);});",
         "--"
       ],
       "env": {

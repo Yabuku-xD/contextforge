@@ -12,7 +12,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
   const client = new Client({ name: "contextforge-test-client", version: "1.0.0" }, { capabilities: {} });
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [path.resolve(".claude-plugin/bootstrap-mcp.mjs"), "--root", sampleRepo],
+    args: [path.resolve("dist/.claude-plugin/bootstrap-mcp.js"), "--root", sampleRepo],
     cwd: path.resolve("."),
     stderr: "pipe"
   });
@@ -211,7 +211,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
 
 test("bootstrap launcher resolves the local dev server when dependencies are available", async () => {
   const { spawnSync } = await import("node:child_process");
-  const result = spawnSync(process.execPath, [path.resolve(".claude-plugin/bootstrap-mcp.mjs")], {
+  const result = spawnSync(process.execPath, [path.resolve("dist/.claude-plugin/bootstrap-mcp.js")], {
     cwd: path.resolve("."),
     env: {
       ...process.env,
@@ -223,6 +223,6 @@ test("bootstrap launcher resolves the local dev server when dependencies are ava
   assert.equal(result.status, 0);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.source, "local");
-  assert.match(payload.serverPath, /src\/mcp-server\.js$/);
+  assert.match(payload.serverPath, /dist\/src\/mcp-server\.js$/);
   assert.equal(payload.installNeeded, false);
 });

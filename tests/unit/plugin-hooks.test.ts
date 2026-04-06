@@ -27,7 +27,7 @@ test("claude plugin hooks register a SessionStart guidance hook", () => {
   const sessionStart = hooks.hooks?.SessionStart?.[0]?.hooks?.[0];
 
   assert.equal(sessionStart?.type, "command");
-  assert.match(sessionStart?.command ?? "", /sessionstart\.mjs$/);
+  assert.match(sessionStart?.command ?? "", /dist\/hooks\/sessionstart\.js$/);
 });
 
 test("claude plugin hooks register PreToolUse routing guards", () => {
@@ -42,12 +42,12 @@ test("claude plugin hooks register PreToolUse routing guards", () => {
   assert.ok(matchers.includes("Task"));
   for (const entry of preToolUse) {
     assert.equal(entry.hooks?.[0]?.type, "command");
-    assert.match(entry.hooks?.[0]?.command ?? "", /pretooluse\.mjs$/);
+    assert.match(entry.hooks?.[0]?.command ?? "", /dist\/hooks\/pretooluse\.js$/);
   }
 });
 
 test("sessionstart hook emits ContextForge routing guidance", () => {
-  const output = execFileSync(process.execPath, ["hooks/sessionstart.mjs"], { encoding: "utf8" });
+  const output = execFileSync(process.execPath, ["dist/hooks/sessionstart.js"], { encoding: "utf8" });
   const payload = JSON.parse(output);
 
   assert.equal(payload.hookSpecificOutput.hookEventName, "SessionStart");
@@ -79,7 +79,7 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
 test("pretooluse denies broad repo subagent fanout", () => {
   const output = execFileSync(
     process.execPath,
-    ["hooks/pretooluse.mjs"],
+    ["dist/hooks/pretooluse.js"],
     {
       encoding: "utf8",
       input: JSON.stringify({
@@ -100,7 +100,7 @@ test("pretooluse denies broad repo subagent fanout", () => {
 test("pretooluse nudges broad repo discovery back toward ContextForge", () => {
   const output = execFileSync(
     process.execPath,
-    ["hooks/pretooluse.mjs"],
+    ["dist/hooks/pretooluse.js"],
     {
       encoding: "utf8",
       input: JSON.stringify({
@@ -121,7 +121,7 @@ test("pretooluse nudges broad repo discovery back toward ContextForge", () => {
 test("pretooluse routes output-heavy bash toward forge_batch", () => {
   const output = execFileSync(
     process.execPath,
-    ["hooks/pretooluse.mjs"],
+    ["dist/hooks/pretooluse.js"],
     {
       encoding: "utf8",
       input: JSON.stringify({
@@ -163,7 +163,7 @@ test("pretooluse denies built-in read after a recent exhaustive walk in the same
 
   const output = execFileSync(
     process.execPath,
-    [path.resolve("hooks/pretooluse.mjs")],
+    [path.resolve("dist/hooks/pretooluse.js")],
     {
       cwd: tempDir,
       encoding: "utf8",

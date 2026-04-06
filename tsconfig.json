@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "noCheck": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.js",
+    "src/**/*.ts",
+    "hooks/**/*.js",
+    "hooks/**/*.ts",
+    "tests/**/*.js",
+    "tests/**/*.ts",
+    ".claude-plugin/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "tests/fixtures/**/*"
+  ]
+}

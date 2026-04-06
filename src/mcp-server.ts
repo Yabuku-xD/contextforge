@@ -3,12 +3,15 @@ import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
-import packageMeta from "../package.json" with { type: "json" };
 
 import { createContextForge } from "./contextforge.js";
 import { registerContextForgeResources } from "./mcp-resources.js";
 import { TOOL_REGISTRY } from "./tools/registry.js";
 import { rememberActiveSession, resolveRuntimeSessionId } from "./session/runtime.js";
+import { readText } from "./utils/fs.js";
+import { resolveProjectPath } from "./utils/runtime-paths.js";
+
+const packageMeta = JSON.parse(readText(resolveProjectPath(import.meta.url, "package.json")));
 
 const SERVER_INFO = {
   name: "contextforge",

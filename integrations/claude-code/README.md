@@ -11,7 +11,7 @@ contextforge install-claude .
 From a local checkout:
 
 ```bash
-node /absolute/path/to/contextforge/src/cli.js install-claude .
+node /absolute/path/to/contextforge/dist/src/cli.js install-claude .
 ```
 
 That writes a project-scoped `.mcp.json` entry automatically.
@@ -43,7 +43,7 @@ claude mcp add --transport stdio --scope project contextforge -- npx -y contextf
 If you are running from a local checkout instead of an installed package, point Claude Code at the repo directly:
 
 ```bash
-claude mcp add --transport stdio --scope project contextforge -- node /absolute/path/to/contextforge/src/mcp-server.js --root .
+claude mcp add --transport stdio --scope project contextforge -- node /absolute/path/to/contextforge/dist/src/mcp-server.js --root .
 ```
 
 Once installed, Claude Code can also invoke ContextForge through chat commands:
