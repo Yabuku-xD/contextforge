@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+import path from "node:path";
 import { openDatabase, isDatabaseLockError } from "../src/storage/db.js";
 import { readActiveSession } from "../src/session/runtime.js";
 
@@ -137,6 +139,11 @@ function createResearchRoutingGuidance(toolName) {
 function loadRecentExhaustiveWalkState(rootDir = process.cwd()) {
   const activeSession = readActiveSession(rootDir);
   if (!activeSession?.sessionId) {
+    return null;
+  }
+
+  const dbPath = path.join(rootDir, ".contextforge", "contextforge.db");
+  if (!fs.existsSync(dbPath)) {
     return null;
   }
 

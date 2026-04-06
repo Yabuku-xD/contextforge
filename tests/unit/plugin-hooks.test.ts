@@ -182,3 +182,31 @@ test("pretooluse denies built-in read after a recent exhaustive walk in the same
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /exhaustive repository walk/i);
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /forge_read/i);
 });
+
+test("pretooluse does not create a repository database just to inspect recent walk state", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-hooks-no-db-"));
+  fs.mkdirSync(path.join(tempDir, ".git"), { recursive: true });
+  rememberActiveSession(tempDir, "missing-db-session", {
+    source: "test",
+    command: "pretooluse"
+  });
+
+  const output = execFileSync(
+    process.execPath,
+    [path.resolve("dist/hooks/pretooluse.js")],
+    {
+      cwd: tempDir,
+      encoding: "utf8",
+      input: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {
+          command: "find . -maxdepth 2 -type f"
+        }
+      })
+    }
+  );
+
+  const payload = JSON.parse(output);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(fs.existsSync(path.join(tempDir, ".contextforge", "contextforge.db")), false);
+});
