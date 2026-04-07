@@ -17,7 +17,7 @@ export function hybridSearch({
   repoGraph,
   limit = 10,
   useGraph = true
-}) {
+}): any[] {
   const raptorPlan = routeRaptorStrategy(query);
   const exact = exactSymbolSearch(query, symbols, limit).map((item) => ({ id: item.symbolId, symbolId: item.symbolId, fileId: item.fileId, label: item.canonicalName, text: item.body, score: item.score, kind: "exact" }));
   const bm25 = bm25Search(db, query, limit).map((item) => ({ ...item, kind: "bm25" }));
@@ -75,7 +75,7 @@ export function hybridSearch({
   return results;
 }
 
-export function planRaptorStrategy(query) {
+export function planRaptorStrategy(query): any {
   return routeRaptorStrategy(query);
 }
 

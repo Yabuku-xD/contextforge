@@ -1,6 +1,6 @@
 let LLMLingua2 = null;
 
-export async function loadLLMLingua2() {
+export async function loadLLMLingua2(): Promise<any> {
   if (LLMLingua2) {
     return LLMLingua2;
   }
@@ -15,7 +15,7 @@ export async function loadLLMLingua2() {
   return LLMLingua2;
 }
 
-export async function compressWithLLMLingua2(text: string, options: Record<string, any> = {}) {
+export async function compressWithLLMLingua2(text: string, options: Record<string, any> = {}): Promise<string | null> {
   const Implementation = await loadLLMLingua2();
   if (!Implementation) {
     return null;

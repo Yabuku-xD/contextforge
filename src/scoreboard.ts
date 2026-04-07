@@ -4,7 +4,7 @@ import { runOpenTrack } from "./open-track.js";
 import { runClosedTrack, runSweBenchSubset } from "./phase3.js";
 import { runReleaseStatus } from "./release.js";
 
-export async function runScoreboard(rootDir) {
+export async function runScoreboard(rootDir): Promise<any> {
   const resolvedRoot = path.resolve(rootDir);
   const [openTrack, swebench, closedTrack, release] = await Promise.all([
     runOpenTrack(resolvedRoot),

@@ -1,4 +1,4 @@
-export function edgeConfidence(edgeType) {
+export function edgeConfidence(edgeType): number {
   if (edgeType === "call") return 0.8;
   if (edgeType === "data") return 0.55;
   if (edgeType === "import") return 0.6;

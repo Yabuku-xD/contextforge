@@ -1,4 +1,4 @@
-export function fallbackImpact(seedSymbolId, edges, depth = 3) {
+export function fallbackImpact(seedSymbolId, edges, depth = 3): string[] {
   const queue = [{ id: seedSymbolId, depth: 0 }];
   const seen = new Set([seedSymbolId]);
 

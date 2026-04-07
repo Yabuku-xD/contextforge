@@ -5,7 +5,7 @@ const SECRET_PATTERNS = [
   /password\s*[:=]\s*["'][^"']+["']/gi
 ];
 
-export function redactSecrets(value) {
+export function redactSecrets(value): string {
   let text = String(value ?? "");
   for (const pattern of SECRET_PATTERNS) {
     text = text.replace(pattern, "[REDACTED]");

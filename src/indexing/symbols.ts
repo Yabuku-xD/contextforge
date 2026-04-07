@@ -11,7 +11,7 @@ const SYMBOL_NODE_TYPES = new Set([
   "method_definition"
 ]);
 
-export function extractSymbols({ repoId, fileId, relativePath, language, tree, content }) {
+export function extractSymbols({ repoId, fileId, relativePath, language, tree, content }): { symbols: any[]; chunks: any[] } {
   const symbols = [];
   const chunks = [];
   const parentPath = [];

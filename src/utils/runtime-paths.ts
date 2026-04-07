@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export function findProjectRoot(moduleUrl) {
+export function findProjectRoot(moduleUrl): string {
   let currentDir = path.dirname(fileURLToPath(moduleUrl));
 
   while (true) {
@@ -21,6 +21,6 @@ export function findProjectRoot(moduleUrl) {
   }
 }
 
-export function resolveProjectPath(moduleUrl, ...segments) {
+export function resolveProjectPath(moduleUrl, ...segments): string {
   return path.join(findProjectRoot(moduleUrl), ...segments);
 }

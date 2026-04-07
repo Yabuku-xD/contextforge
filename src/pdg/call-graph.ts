@@ -14,7 +14,7 @@ const IGNORED_CALLS = new Set([
   "while"
 ]);
 
-export function extractCallEdges({ repoId, symbols, files = [] }) {
+export function extractCallEdges({ repoId, symbols, files = [] }): any[] {
   const symbolsByName = new Map();
   const importAliasesByFile = new Map();
 

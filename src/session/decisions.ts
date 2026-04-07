@@ -1,6 +1,6 @@
 import { recordSessionEvent } from "./events.js";
 
-export function recordDecision(db, { repoId, sessionId, decision, scope = "general" }) {
+export function recordDecision(db, { repoId, sessionId, decision, scope = "general" }): any {
   return recordSessionEvent(db, {
     repoId,
     sessionId,

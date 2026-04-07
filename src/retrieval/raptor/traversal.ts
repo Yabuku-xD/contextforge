@@ -1,4 +1,4 @@
-export function traversalSearch(query, raptorNodes, limit = 10) {
+export function traversalSearch(query, raptorNodes, limit = 10): any[] {
   const lowered = String(query ?? "").toLowerCase();
   const modules = raptorNodes.filter((node) => node.nodeType === "module");
   const files = raptorNodes.filter((node) => node.nodeType === "file");

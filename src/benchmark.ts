@@ -49,7 +49,7 @@ const COMPRESSION_SCENARIOS = [
   }
 ];
 
-export async function runBenchmarks(rootDir) {
+export async function runBenchmarks(rootDir): Promise<any> {
   const forge = createContextForge(rootDir);
   try {
     const indexSummary = forge.indexRepository();

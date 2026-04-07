@@ -28,7 +28,7 @@ type ClaudeInstallOptions = {
   dontAsk?: boolean;
 };
 
-export function installClaudeCodeProject(targetDir = process.cwd(), options: ClaudeInstallOptions = {}) {
+export function installClaudeCodeProject(targetDir = process.cwd(), options: ClaudeInstallOptions = {}): any {
   const resolvedTarget = path.resolve(targetDir);
   const configPath = path.join(resolvedTarget, ".mcp.json");
   const serverName = options.serverName ?? DEFAULT_SERVER_NAME;
@@ -66,7 +66,7 @@ export function installClaudeCodeProject(targetDir = process.cwd(), options: Cla
   };
 }
 
-export function buildClaudeCodeServerEntry(rootArg = ".") {
+export function buildClaudeCodeServerEntry(rootArg = "."): any {
   return {
     command: "node",
     args: [MCP_SERVER_PATH, "--root", rootArg],
@@ -88,7 +88,7 @@ function sameEntry(left: any, right: any) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function mergeClaudeCodePermissions(targetDir = process.cwd(), options: ClaudeInstallOptions = {}) {
+export function mergeClaudeCodePermissions(targetDir = process.cwd(), options: ClaudeInstallOptions = {}): any {
   const resolvedTarget = path.resolve(targetDir);
   const settingsDir = path.join(resolvedTarget, ".claude");
   const configPath = path.join(settingsDir, "settings.local.json");
@@ -141,12 +141,12 @@ export function mergeClaudeCodePermissions(targetDir = process.cwd(), options: C
   };
 }
 
-export function syncClaudeCodePermissions(startDir = process.cwd(), options: ClaudeInstallOptions = {}) {
+export function syncClaudeCodePermissions(startDir = process.cwd(), options: ClaudeInstallOptions = {}): any {
   const targets = findClaudeProjectTargets(startDir);
   return targets.map((targetDir) => mergeClaudeCodePermissions(targetDir, options));
 }
 
-export function findClaudeProjectTargets(startDir = process.cwd()) {
+export function findClaudeProjectTargets(startDir = process.cwd()): any[] {
   const resolvedStart = path.resolve(startDir);
   if (!exists(resolvedStart)) {
     return [];

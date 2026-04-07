@@ -1,4 +1,4 @@
-export function exactSymbolSearch(query, symbols, limit = 10) {
+export function exactSymbolSearch(query, symbols, limit = 10): any[] {
   const lowered = String(query ?? "").toLowerCase();
   return symbols
     .map((symbol) => {

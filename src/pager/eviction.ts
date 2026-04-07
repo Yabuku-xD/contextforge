@@ -1,6 +1,6 @@
 import { pageAffinity } from "./affinity.js";
 
-export function scorePageForEviction(page, context = {}, now = Date.now()) {
+export function scorePageForEviction(page, context = {}, now = Date.now()): number {
   const ageMs = Math.max(now - page.lastUsedAt, 1);
   const recencyPenalty = ageMs / 1000;
   const pinBonus = page.pinState === "pinned" ? 1000 : 0;
@@ -9,7 +9,7 @@ export function scorePageForEviction(page, context = {}, now = Date.now()) {
   return recencyPenalty - faultBonus - pinBonus + (page.sizeEstimate ?? 0) / 500 - affinity.keepScore;
 }
 
-export function chooseEvictions(pages, zone, context = {}) {
+export function chooseEvictions(pages, zone, context = {}): any[] {
   if (zone === "green") {
     return [];
   }

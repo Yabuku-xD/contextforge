@@ -1,4 +1,4 @@
-export function noteFault(page) {
+export function noteFault(page): any {
   return {
     ...page,
     faultCount: (page.faultCount ?? 0) + 1,
@@ -6,6 +6,6 @@ export function noteFault(page) {
   };
 }
 
-export function retrievalHandle({ label, toolHint }) {
+export function retrievalHandle({ label, toolHint }): string {
   return `[Paged out: ${label}. Re-open with ${toolHint}.]`;
 }

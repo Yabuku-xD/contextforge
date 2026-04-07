@@ -1,7 +1,7 @@
 import { makeId } from "../indexing/canonicalize.js";
 import { scorePageForEviction } from "./eviction.js";
 
-export function createPage({ sessionId, pageType, sourceItemType, sourceItemId, sizeEstimate }) {
+export function createPage({ sessionId, pageType, sourceItemType, sourceItemId, sizeEstimate }): any {
   return {
     pageId: makeId("page", `${sessionId}:${pageType}:${sourceItemType}:${sourceItemId}`),
     sessionId,
@@ -16,7 +16,7 @@ export function createPage({ sessionId, pageType, sourceItemType, sourceItemId, 
   };
 }
 
-export function touchPage(page) {
+export function touchPage(page): any {
   const next = {
     ...page,
     lastUsedAt: Date.now()

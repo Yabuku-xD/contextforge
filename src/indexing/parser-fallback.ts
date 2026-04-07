@@ -1,7 +1,7 @@
 import { makeId } from "./canonicalize.js";
 import { sha1 } from "../utils/hash.js";
 
-export function createFallbackFileArtifacts({ repoId, fileId, relativePath, language, content }) {
+export function createFallbackFileArtifacts({ repoId, fileId, relativePath, language, content }): any {
   const chunkId = makeId("chunk", `${relativePath}:file`);
   const symbolId = makeId("symbol", `${relativePath}:file`);
 

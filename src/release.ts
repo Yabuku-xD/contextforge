@@ -5,7 +5,7 @@ import { runPhase3 } from "./phase3.js";
 import { reportInventory } from "./reports.js";
 import { readActiveSession } from "./session/runtime.js";
 
-export async function runReleaseStatus(rootDir) {
+export async function runReleaseStatus(rootDir): Promise<any> {
   const resolvedRoot = path.resolve(rootDir);
   const forge = createContextForge(resolvedRoot, { sessionId: "release_status" });
 

@@ -1,4 +1,4 @@
-export function classifyContent(content: string, metadata: Record<string, any> = {}) {
+export function classifyContent(content: string, metadata: Record<string, any> = {}): string {
   const text = String(content ?? "");
   const filePath = String(metadata.filePath ?? "");
   const loweredPath = filePath.toLowerCase();

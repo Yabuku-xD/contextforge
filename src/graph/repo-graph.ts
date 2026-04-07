@@ -1,7 +1,7 @@
 import { makeId } from "../indexing/canonicalize.js";
 import { edgeConfidence } from "./confidence.js";
 
-export function buildRepoGraph({ repoId, files, symbols, pdgEdges, raptorNodes = [] }) {
+export function buildRepoGraph({ repoId, files, symbols, pdgEdges, raptorNodes = [] }): { nodes: any[]; edges: any[] } {
   const nodes = [];
   const edges = [];
   const moduleNodes = raptorNodes.filter((node) => node.nodeType === "module");
