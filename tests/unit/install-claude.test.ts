@@ -111,6 +111,28 @@ test("mergeClaudeCodePermissions preserves existing project-local Claude setting
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
 });
 
+test("mergeClaudeCodePermissions repairs stale dontAsk back to default when dontAsk is explicitly false", () => {
+  const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-reset-"));
+  const settingsPath = path.join(tempDir, ".claude", "settings.local.json");
+  fs.mkdirSync(path.join(tempDir, ".claude"), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({
+    permissions: {
+      defaultMode: "dontAsk",
+      allow: []
+    }
+  }, null, 2));
+
+  const result = mergeClaudeCodePermissions(tempDir, {
+    allowMutations: false,
+    dontAsk: false
+  });
+  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+
+  assert.equal(result.defaultMode, "default");
+  assert.equal(settings.permissions.defaultMode, "default");
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
+});
+
 test("findClaudeProjectTargets resolves the nearest real project root from nested folders", () => {
   const tempDir = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-install-targets-"));
   const projectRoot = path.join(tempDir, "workspace");

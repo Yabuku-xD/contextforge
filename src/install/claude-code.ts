@@ -111,8 +111,13 @@ export function mergeClaudeCodePermissions(targetDir = process.cwd(), options: C
     config.permissions.allow = [];
   }
 
-  if (options.dontAsk && !config.permissions.defaultMode) {
+  if (options.dontAsk === true) {
     config.permissions.defaultMode = "dontAsk";
+  } else if (options.dontAsk === false && config.permissions.defaultMode === "dontAsk") {
+    // If a previous install pinned dontAsk, let an explicit false repair the
+    // project back to the normal interactive default instead of preserving the
+    // stale override forever.
+    config.permissions.defaultMode = "default";
   }
 
   const previousAllow = new Set(config.permissions.allow);
