@@ -1,6 +1,6 @@
 export const forgeScopeTool = {
   name: "forge_scope",
-  description: "Architecture and relationship lookup for prompts like `how is this project structured`, `which modules talk to each other`, `show the flow between areas`, or `explain the high-level scope of X`.",
+  description: "Architecture and relationship lookup for prompts like `how is this project structured`, `which modules talk to each other`, `show the flow between areas`, `explain the high-level scope of X`, `how do these pieces fit together`, or `show the wiring between modules`.",
   parameters: { query: "string", mode: "auto | collapsed | traversal ?" },
   execute(forge: any, args: any = {}) {
     return forge.scope(args.query ?? "", normalizeMode(args.mode));

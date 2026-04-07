@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.51`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.52`.
 
 ## What This Guide Covers
 
@@ -98,6 +98,7 @@ ContextForge exposes these user-invocable commands:
 /contextforge:forge-memory-status
 /contextforge:forge-memory-wakeup
 /contextforge:forge-memory-recall [query]
+/contextforge:forge-memory-navigate
 /contextforge:forge-memory-search [query]
 /contextforge:forge-memory-save [note]
 /contextforge:forge-memory-profile-set [profile]
@@ -126,6 +127,7 @@ Recommended command map:
 - `/contextforge:forge-understand` for fast repo orientation
 - `/contextforge:forge-walk` for deeper package-by-package or folder-by-folder walkthroughs
 - `/contextforge:forge-memory-wakeup` or `/contextforge:forge-memory-status` before assuming prior decisions or project history
+- `/contextforge:forge-memory-navigate` when you want to inspect the durable memory wings, halls, and rooms before doing deeper recall
 - `forge_memory_save`, `forge_memory_diary_write`, and the fact tools for durable long-term memory
 - `forge_batch` for shell-heavy research and large command output you do not want dumped into chat
 - `forge_lookup` for follow-up questions against stored research output

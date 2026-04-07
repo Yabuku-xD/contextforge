@@ -5,6 +5,7 @@ import {
   getMemoryStats,
   listActiveFacts,
   listRecentMemoryEntries,
+  navigateMemory,
   readDiaryEntries,
   searchMemory
 } from "./store.js";
@@ -27,6 +28,7 @@ export function buildMemoryStatus(db: any, {
   const project = getMemoryProfile(db, `project:${repoName}`);
   const counts = getMemoryStats(db, repoId);
   const wakeup = buildMemoryWakeup(db, { repoId, repoName, sessionId, includeProtocol: false });
+  const topology = navigateMemory(db, { repoId, wing: repoName, limit: 6 });
 
   return {
     repoId,
@@ -60,6 +62,7 @@ export function buildMemoryStatus(db: any, {
       }
     },
     wakeupPreview: wakeup.text,
+    topologyPreview: topology.topology,
     dialectSpec: CONTEXTFORGE_MEMORY_DIALECT_SPEC
   };
 }
@@ -72,12 +75,12 @@ export function buildMemoryWakeup(db: any, {
 }: Record<string, any> = {}) {
   const identity = getMemoryProfile(db, "identity");
   const project = getMemoryProfile(db, `project:${repoName}`);
-  const essentialEntries = listRecentMemoryEntries(db, { repoId, wing: repoName, limit: 6 });
+  const essentialEntries = rankWakeupEntries(listRecentMemoryEntries(db, { repoId, wing: repoName, limit: 12 })).slice(0, 6);
   const recentEntries = essentialEntries.length
     ? essentialEntries
-    : listRecentMemoryEntries(db, { repoId, limit: 6 });
-  const activeFacts = listActiveFacts(db, repoId, 6);
-  const diaries = readDiaryEntries(db, { repoId, sessionId, limit: 3 });
+    : rankWakeupEntries(listRecentMemoryEntries(db, { repoId, limit: 12 })).slice(0, 6);
+  const activeFacts = rankWakeupFacts(listActiveFacts(db, repoId, 12)).slice(0, 6);
+  const diaries = rankWakeupDiaries(readDiaryEntries(db, { repoId, sessionId, limit: 8 })).slice(0, 3);
 
   const layer0Text = buildLayer0(identity, project, repoName);
   const layer1Text = buildLayer1(recentEntries, activeFacts, diaries);
@@ -125,12 +128,20 @@ export function buildMemoryRecall(db: any, {
   }
 
   const entries = listRecentMemoryEntries(db, { repoId, wing: normalizedWing, hall, room, limit });
+  const navigation = navigateMemory(db, {
+    repoId,
+    wing: normalizedWing,
+    hall,
+    room,
+    limit
+  });
   return {
     layer: "L2",
     mode: "scoped_recent",
     wing: normalizedWing,
     hall,
     room,
+    navigation,
     results: entries.map((entry: any) => ({
       kind: "entry",
       entryId: entry.entryId,
@@ -234,4 +245,73 @@ function profileSummary(profile: any) {
     aaak: profile.aaak,
     updatedAt: profile.updatedAt
   };
+}
+
+function rankWakeupEntries(entries: any[]) {
+  return [...entries].sort((left, right) => {
+    const leftScore = entryWakeupScore(left);
+    const rightScore = entryWakeupScore(right);
+    return rightScore - leftScore || Number(right.updatedAt ?? 0) - Number(left.updatedAt ?? 0);
+  });
+}
+
+function rankWakeupFacts(facts: any[]) {
+  return [...facts].sort((left, right) => {
+    const leftScore = factWakeupScore(left);
+    const rightScore = factWakeupScore(right);
+    return rightScore - leftScore || Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0);
+  });
+}
+
+function rankWakeupDiaries(diaries: any[]) {
+  return [...diaries].sort((left, right) => {
+    const leftScore = diaryWakeupScore(left);
+    const rightScore = diaryWakeupScore(right);
+    return rightScore - leftScore || Number(right.createdAt ?? 0) - Number(left.createdAt ?? 0);
+  });
+}
+
+function entryWakeupScore(entry: any) {
+  const sourceWeight = {
+    manual: 0.96,
+    import: 0.9,
+    bridge: 0.84,
+    session_autosave: 0.7,
+    diary: 0.68,
+    inferred: 0.48,
+    derived: 0.42
+  }[String(entry.sourceType ?? "manual")] ?? 0.58;
+  let score = (Number(entry.importance ?? 0.5) * 0.5) + (sourceWeight * 0.42);
+  if (entry.sourceRef) score += 0.04;
+  if ((entry.entities ?? []).length) score += 0.03;
+  if (["facts", "discoveries", "preferences"].includes(String(entry.hall ?? ""))) score += 0.04;
+  return score;
+}
+
+function factWakeupScore(fact: any) {
+  const sourceWeight = {
+    manual: 0.96,
+    verified: 0.94,
+    import: 0.88,
+    session_autosave: 0.68,
+    inferred: 0.45,
+    derived: 0.4
+  }[String(fact.sourceKind ?? "manual")] ?? 0.6;
+  let score = (Number(fact.confidence ?? 0.5) * 0.48) + (sourceWeight * 0.42);
+  if (fact.current) score += 0.06;
+  if (fact.sourceEntryId) score += 0.04;
+  if (fact.metadata?.verified === true) score += 0.06;
+  if (fact.conflicted) score -= 0.12;
+  return score;
+}
+
+function diaryWakeupScore(diary: any) {
+  let score = diary.agentId === "claude" ? 0.72 : 0.62;
+  if (diary.repoId) score += 0.04;
+  if (diary.sessionId) score += 0.04;
+  if ((diary.tags ?? []).some((tag: any) => /checkpoint|decision|summary|milestone/i.test(String(tag)))) {
+    score += 0.08;
+  }
+  if (String(diary.title ?? "").trim()) score += 0.03;
+  return score;
 }

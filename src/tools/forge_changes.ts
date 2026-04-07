@@ -1,6 +1,6 @@
 export const forgeChangesTool = {
   name: "forge_changes",
-  description: "Map git changes to indexed symbols for prompts like `what changed on this branch`, `which files or functions are affected by this diff`, or `summarize the current changes by area`.",
+  description: "Map git changes to indexed symbols for prompts like `what changed on this branch`, `which files or functions are affected by this diff`, `summarize the current changes by area`, `what touched this branch`, or `what did this commit change`.",
   parameters: {
     scope: "string?",
     base_ref: "string?"

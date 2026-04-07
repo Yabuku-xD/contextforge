@@ -4,7 +4,16 @@ import { clip, tokenize, unique } from "../utils/text.js";
 import { renderForgeCapsule } from "./dialect.js";
 import { slugify } from "./store.js";
 
-const IGNORED_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
+const IGNORED_EVENT_TYPES = new Set([
+  "index",
+  "index_reuse",
+  "startup",
+  "search",
+  "memory_save",
+  "memory_diary_write",
+  "memory_fact_add",
+  "memory_fact_invalidate"
+]);
 const AUTOSAVE_EVENT_THRESHOLD = 8;
 
 export function buildSessionCheckpointCandidate(events: any[], {
@@ -27,13 +36,15 @@ export function buildSessionCheckpointCandidate(events: any[], {
   }
 
   const tags = collectTags(relevant);
+  const focus = collectFocus(relevant);
   const title = `${repoName} checkpoint ${new Date(relevant[relevant.length - 1].createdAt).toISOString().slice(0, 16).replace("T", " ")}`;
   const hall = inferHall(relevant);
-  const room = slugify(tags[0] ?? repoName, "general");
-  const summary = buildSummary(relevant, tags);
+  const room = slugify(focus.primaryRoom ?? tags[0] ?? repoName, "general");
+  const summary = buildSummary(relevant, tags, focus);
   const detail = relevant.map((event) => `- ${formatEventLine(event)}`).join("\n");
   const entities = unique([
     repoName,
+    ...focus.entities,
     ...tags.filter((tag) => !tag.includes("/")).slice(0, 5)
   ]);
   const importance = Math.min(1, 0.35 + (relevant.length / 16));
@@ -83,7 +94,7 @@ export function buildDiaryFromCheckpoint(checkpoint: Record<string, any>, agentI
   };
 }
 
-function buildSummary(events: any[], tags: string[]) {
+function buildSummary(events: any[], tags: string[], focus: Record<string, any>) {
   const typeCounts = new Map<string, number>();
   for (const event of events) {
     typeCounts.set(event.eventType, (typeCounts.get(event.eventType) ?? 0) + 1);
@@ -93,8 +104,13 @@ function buildSummary(events: any[], tags: string[]) {
     .slice(0, 3)
     .map(([eventType, count]) => `${eventType} x${count}`)
     .join(", ");
+  const focusParts = [
+    focus.primaryFile ? `focused on ${focus.primaryFile}` : "",
+    focus.primarySymbol ? `symbol ${focus.primarySymbol}` : "",
+    focus.primaryQuery ? `query ${focus.primaryQuery}` : ""
+  ].filter(Boolean);
   const tagSummary = tags.slice(0, 4).join(", ");
-  return clip(`Captured ${events.length} session events (${eventSummary})${tagSummary ? ` around ${tagSummary}` : ""}.`, 220);
+  return clip(`Captured ${events.length} session events (${eventSummary})${focusParts.length ? `; ${focusParts.join(", ")}` : ""}${tagSummary ? ` around ${tagSummary}` : ""}.`, 220);
 }
 
 function inferHall(events: any[]) {
@@ -112,6 +128,40 @@ function inferHall(events: any[]) {
     return "advice";
   }
   return "events";
+}
+
+function collectFocus(events: any[]) {
+  const fileCounts = new Map<string, number>();
+  const symbolCounts = new Map<string, number>();
+  const queryCounts = new Map<string, number>();
+
+  for (const event of events) {
+    const payload = event.payload ?? {};
+    for (const candidate of [payload.filePath, payload.topFilePath]) {
+      if (candidate) {
+        fileCounts.set(String(candidate), (fileCounts.get(String(candidate)) ?? 0) + 1);
+      }
+    }
+    if (payload.symbolId) {
+      const symbol = String(payload.symbolId).split(":").pop() ?? String(payload.symbolId);
+      symbolCounts.set(symbol, (symbolCounts.get(symbol) ?? 0) + 1);
+    }
+    if (payload.query) {
+      const query = clip(String(payload.query).replace(/\s+/g, " ").trim(), 60);
+      queryCounts.set(query, (queryCounts.get(query) ?? 0) + 1);
+    }
+  }
+
+  const primaryFile = topCount(fileCounts);
+  const primarySymbol = topCount(symbolCounts);
+  const primaryQuery = topCount(queryCounts);
+  return {
+    primaryFile,
+    primarySymbol,
+    primaryQuery,
+    primaryRoom: primarySymbol ?? (primaryFile ? path.basename(primaryFile, path.extname(primaryFile)) : null),
+    entities: unique([primarySymbol, primaryFile ? path.basename(primaryFile) : null, primaryFile].filter(Boolean))
+  };
 }
 
 function collectTags(events: any[]) {
@@ -134,6 +184,10 @@ function collectTags(events: any[]) {
     tags.push(event.eventType);
   }
   return unique(tags.map((tag) => String(tag).trim()).filter(Boolean)).slice(0, 12);
+}
+
+function topCount(map: Map<string, number>) {
+  return [...map.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
 }
 
 function formatEventLine(event: any) {

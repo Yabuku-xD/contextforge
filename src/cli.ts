@@ -144,7 +144,8 @@ async function main(argv) {
     "memory-fact-add",
     "memory-fact-invalidate",
     "memory-fact-query",
-    "memory-timeline"
+    "memory-timeline",
+    "memory-navigate"
   ].includes(command)) {
     const commandRoot = path.resolve(
       command === "memory-status" || command === "memory-wakeup" || command === "memory-diary-read"
@@ -165,6 +166,8 @@ async function main(argv) {
                       ? (rest[1] ?? process.cwd())
                       : command === "memory-timeline"
                         ? (rest[1] ?? process.cwd())
+                        : command === "memory-navigate"
+                          ? (rest[3] ?? process.cwd())
                         : (rest[1] ?? process.cwd())
     );
     const forge = createContextForge(commandRoot);
@@ -228,6 +231,13 @@ async function main(argv) {
           break;
         case "memory-timeline":
           console.log(JSON.stringify(forge.memoryTimeline(rest[0] ?? ""), null, 2));
+          break;
+        case "memory-navigate":
+          console.log(JSON.stringify(forge.memoryNavigate({
+            wing: rest[0] ?? undefined,
+            hall: rest[1] ?? undefined,
+            room: rest[2] ?? undefined
+          }), null, 2));
           break;
       }
     } finally {

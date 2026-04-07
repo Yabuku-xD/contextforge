@@ -1,6 +1,6 @@
 export const forgeSearchTool = {
   name: "forge_search",
-  description: "Hybrid repository search for prompts like `find where X is implemented`, `which file handles Y`, `search for this behavior`, or `locate the code path for Z`.",
+  description: "Hybrid repository search for prompts like `find where X is implemented`, `which file handles Y`, `search for this behavior`, `locate the code path for Z`, `show me where this logic lives`, or `what file is responsible for this`.",
   parameters: { query: "string", limit: "number?" },
   execute(forge: any, args: any = {}) {
     return forge.search(args.query ?? "", { limit: normalizeLimit(args.limit) });

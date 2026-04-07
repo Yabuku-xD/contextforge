@@ -1,6 +1,6 @@
 export const forgeWriteTool = {
   name: "forge_write",
-  description: "Create or overwrite a file for prompts like `create this file`, `write this content`, or `replace the full file contents` inside the current repository.",
+  description: "Create or overwrite a file for prompts like `create this file`, `write this content`, `replace the full file contents`, or `make docs/notes.md with this text` inside the current repository.",
   parameters: {
     path: "string",
     content: "string",

@@ -1,6 +1,6 @@
 export const forgeMemorySearchTool = {
   name: "forge_memory_search",
-  description: "Deep-search global or repo memory for prompts like `search remembered decisions about X`, `find past notes`, or `what do you remember about this person/project`.",
+  description: "Deep-search global or repo memory for prompts like `search remembered decisions about X`, `find past notes`, `what do you remember about this person/project`, or `did we already decide this earlier`.",
   parameters: {
     query: "string",
     wing: "string?",

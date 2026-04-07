@@ -36,6 +36,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_status"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_wakeup"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_search"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_navigate"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_batch"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_lookup"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_scan"));
@@ -61,6 +62,10 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.match(toolDescriptions.forge_scope, /how is this project structured|which modules talk to each other/i);
     assert.match(toolDescriptions.forge_memory_wakeup, /wake-up memory|prior decisions|project history/i);
     assert.match(toolDescriptions.forge_memory_save, /remember this|save this decision|long-term/i);
+    assert.match(toolDescriptions.forge_read, /show me this file|peek at package\.json/i);
+    assert.match(toolDescriptions.forge_edit, /patch this block in place|swap this snippet/i);
+    assert.match(toolDescriptions.forge_write, /create this file|make docs\/notes\.md/i);
+    assert.match(toolDescriptions.forge_bash, /run git status here|run pwd/i);
 
     const resources = await client.listResources();
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/overview"));
@@ -68,6 +73,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/schema"));
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://memory/status"));
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://memory/wakeup"));
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://memory/navigate"));
 
     const overviewResource = await client.readResource({
       uri: "contextforge://repo/overview"
@@ -78,6 +84,11 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
       uri: "contextforge://memory/status"
     });
     assert.match(textContent(memoryStatusResource), /globalMemory|L0_identity/i);
+
+    const memoryNavigateResource = await client.readResource({
+      uri: "contextforge://memory/navigate"
+    });
+    assert.match(textContent(memoryNavigateResource), /topology|wings|summary/i);
 
     const generatedMapPath = path.join(sampleRepo, ".contextforge", "generated", "map.md");
     const generatedContractsPath = path.join(sampleRepo, ".contextforge", "generated", "contracts.md");
@@ -112,6 +123,7 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.ok(!startup.isError);
     assert.match(startup.content[0].text, /filesIndexed/);
     assert.match(startup.content[0].text, /recommendedNextTool/);
+    assert.match(startup.content[0].text, /recommendedReason/);
 
     const memorySave = await client.callTool({
       name: "forge_memory_save",
@@ -138,6 +150,13 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     });
     assert.ok(!memorySearch.isError);
     assert.match(memorySearch.content[0].text, /Found .* memory hit|results/);
+
+    const memoryNavigate = await client.callTool({
+      name: "forge_memory_navigate",
+      arguments: {}
+    });
+    assert.ok(!memoryNavigate.isError);
+    assert.match(memoryNavigate.content[0].text, /topology|wings|summary/);
 
     const search = await client.callTool({
       name: "forge_search",

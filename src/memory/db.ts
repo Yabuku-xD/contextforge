@@ -40,17 +40,22 @@ export function openMemoryDatabase(options: { memoryRoot?: string | null } = {})
   ensureColumn(db, "memory_entries", "repo_id", "TEXT");
   ensureColumn(db, "memory_entries", "session_id", "TEXT");
   ensureColumn(db, "memory_entries", "aaak", "TEXT");
+  ensureColumn(db, "memory_entries", "semantic_json", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "memory_entries", "embedding_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "memory_entries", "tags_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "memory_entries", "importance", "REAL NOT NULL DEFAULT 0.5");
   ensureColumn(db, "memory_entries", "source_type", "TEXT NOT NULL DEFAULT 'manual'");
   ensureColumn(db, "memory_entries", "source_ref", "TEXT");
   ensureColumn(db, "memory_diaries", "aaak", "TEXT");
+  ensureColumn(db, "memory_diaries", "semantic_json", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "memory_diaries", "embedding_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "memory_diaries", "tags_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "memory_triples", "repo_id", "TEXT");
   ensureColumn(db, "memory_triples", "session_id", "TEXT");
   ensureColumn(db, "memory_triples", "source_entry_id", "TEXT");
   ensureColumn(db, "memory_triples", "source_kind", "TEXT NOT NULL DEFAULT 'manual'");
   ensureColumn(db, "memory_triples", "metadata_json", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "memory_triples", "embedding_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "memory_checkpoints", "last_event_at", "INTEGER");
   return db;
 }

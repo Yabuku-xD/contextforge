@@ -33,7 +33,7 @@ Use ContextForge as the first stop for repository context work.
    - coordinated rename preview or apply: `forge_rename`
    - why a file, symbol, or behavior matters: `forge_why`
    - long-term memory status or wake-up context: `forge_memory_status` or `forge_memory_wakeup`
-   - scoped memory recall or deep remembered search: `forge_memory_recall` or `forge_memory_search`
+   - scoped memory recall, topology navigation, or deep remembered search: `forge_memory_recall`, `forge_memory_navigate`, or `forge_memory_search`
    - save durable decisions, discoveries, or preferences: `forge_memory_save`
    - set or inspect identity/project profiles: `forge_memory_profile_set` or `forge_memory_profile_get`
    - write or read diary checkpoints: `forge_memory_diary_write` or `forge_memory_diary_read`
@@ -51,9 +51,25 @@ Use ContextForge as the first stop for repository context work.
 ContextForge's `src/router/query-signals.ts` extracts these signals from the request. Use them as a deterministic first pass before applying the prose rules above — it normalizes synonyms (`dir`→`directory`, `pkg`→`package`, `code base`→`codebase`, `sub-folder`→`subfolder`), handles hyphens and plurals, and respects negation / scoped paths.
 
 - `signals.broadDiscovery` → `forge_scan`
+- `signals.intentResume` → `forge_resume`
+- `signals.intentMemorySave` → `forge_memory_save`
+- `signals.intentMemoryWakeup` → `forge_memory_wakeup`
+- `signals.intentMemoryNavigate` → `forge_memory_navigate`
+- `signals.intentMemoryTimeline` → `forge_memory_timeline`
+- `signals.intentMemorySearch` → `forge_memory_search`
+- `signals.intentLookup` → `forge_lookup`
+- `signals.intentMap` / `signals.intentWiki` / `signals.intentContracts` → `forge_map` / `forge_wiki` / `forge_contracts`
+- `signals.intentListRepos` / `signals.intentGroupQuery` / `signals.intentGroupStatus` → `forge_list_repos` / `forge_group_query` / `forge_group_status`
 - `signals.exhaustive && !signals.negation && signals.scopeHints.length === 0` → `forge_walk`
 - `signals.broadRepo && !signals.negation` → `forge_understand`
+- `signals.intentRename` → `forge_rename`
+- `signals.intentChanges` → `forge_changes`
+- `signals.intentWhy` → `forge_why`
+- `signals.intentImpact` → `forge_impact`
 - `signals.exactSymbol` → `forge_symbol`
+- `signals.intentScope` → `forge_scope`
+- `signals.intentWrite` / `signals.intentEdit` / `signals.intentRead` → `forge_write` / `forge_edit` / `forge_read`
+- `signals.shellIntent && !signals.outputHeavy` → `forge_bash`
 - `signals.pinpoint` → `forge_impact`
 - `signals.outputHeavy` → `forge_batch`
 - otherwise → `forge_search`
@@ -61,8 +77,19 @@ ContextForge's `src/router/query-signals.ts` extracts these signals from the req
 Memory routing:
 - "remember this", "save this decision", "store this long-term" → `forge_memory_save`
 - "what should you remember", "wake up memory", "load prior decisions" → `forge_memory_wakeup`
+- "what does the memory map look like", "show the memory rooms", "navigate project memory" → `forge_memory_navigate`
 - "what do you remember about X", "search remembered notes", "verify this remembered fact" → `forge_memory_search` or `forge_memory_fact_query`
 - "timeline of X", "what changed over time" → `forge_memory_timeline`
+
+Broader natural-language cues:
+- "what touched this branch", "what did this commit change", "review these modifications" → `forge_changes`
+- "what’s this file doing here", "what role does this module play", "why do we have this" → `forge_why`
+- "what depends on this", "what else will this break", "show downstream fallout" → `forge_impact`
+- "open package.json", "show src/foo.ts", "read the README", "list this directory" → `forge_read`
+- "replace this exact block in src/foo.ts", "patch this string in place" → `forge_edit`
+- "create docs/notes.md", "overwrite this file with the new content" → `forge_write`
+- "run git status", "execute pwd here", "run this small repo command" → `forge_bash`
+- "continue where we left off", "pick up the previous session" → `forge_resume`
 
 This mirrors `recommendForgeTool(signals)` and is the same routing used by the walk-mode helpers, the startup task classifier, the RAPTOR strategy router, and the PreToolUse hook — so behavior stays consistent across the full stack.
 

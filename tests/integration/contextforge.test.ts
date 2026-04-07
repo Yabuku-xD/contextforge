@@ -132,12 +132,34 @@ test("ContextForge global memory persists wakeup entries, facts, diaries, and au
     assert.doesNotMatch(saved.entry.summary, /secret123|sk-abcdefghijklmnopqrstuvwxyz/);
     assert.match(saved.entry.summary, /\[REDACTED\]/);
 
+    forge.memorySave({
+      title: "Speculative storage guess",
+      summary: "A weaker inferred note guesses the durable memory backend might be SQLite-like storage.",
+      detail: "This entry exists to ensure provenance-weighted retrieval keeps manual decisions above inferred guesses.",
+      hall: "discoveries",
+      tags: ["sqlite", "memory"],
+      entities: ["ContextForge", "SQLite"],
+      sourceType: "inferred",
+      importance: 0.7
+    });
+
     const fact = forge.memoryFactAdd({
       subject: "ContextForge",
       predicate: "uses",
       object: "SQLite"
     });
     assert.equal(fact.object, "SQLite");
+
+    forge.memoryFactAdd({
+      subject: "ContextForge",
+      predicate: "current-version",
+      object: "0.1.50"
+    });
+    forge.memoryFactAdd({
+      subject: "ContextForge",
+      predicate: "current-version",
+      object: "0.1.51"
+    });
 
     const diary = forge.memoryDiaryWrite({
       title: "Memory checkpoint",
@@ -163,12 +185,29 @@ test("ContextForge global memory persists wakeup entries, facts, diaries, and au
 
     const search = forge.memorySearch("SQLite");
     assert.ok(search.results.some((result: any) => result.preview?.includes("SQLite") || result.object === "SQLite"));
+    const semanticSearch = forge.memorySearch("persistent database backend");
+    assert.ok(semanticSearch.results.some((result: any) => /SQLite|database/i.test(result.preview ?? result.object ?? "")));
+    const provenanceSearch = forge.memorySearch("durable memory sqlite backend");
+    const manualIndex = provenanceSearch.results.findIndex((result: any) => result.title === "SQLite memory decision");
+    const inferredIndex = provenanceSearch.results.findIndex((result: any) => result.title === "Speculative storage guess");
+    assert.ok(manualIndex >= 0);
+    assert.ok(inferredIndex >= 0);
+    assert.ok(manualIndex < inferredIndex);
 
     const facts = forge.memoryFactQuery("ContextForge");
     assert.ok(facts.facts.some((entry: any) => entry.object === "SQLite"));
+    assert.equal(facts.facts.filter((entry: any) => entry.predicate === "current_version" && entry.current).length, 1);
+    assert.ok(facts.facts.some((entry: any) => entry.predicate === "current_version" && entry.object === "0.1.51" && entry.current));
+    assert.ok(facts.facts.some((entry: any) => entry.predicate === "current_version" && entry.object === "0.1.50" && !entry.current));
 
     const timeline = forge.memoryTimeline("ContextForge");
     assert.ok(timeline.events.some((entry: any) => entry.object === "SQLite"));
+    assert.ok(timeline.events.some((entry: any) => entry.predicate === "current_version" && entry.object === "0.1.50" && !entry.current));
+
+    const navigation = forge.memoryNavigate();
+    assert.ok(navigation.topology.halls.some((entry: any) => entry.hall === "discoveries"));
+    const roomNavigation = forge.memoryNavigate({ hall: "discoveries" });
+    assert.ok(roomNavigation.topology.rooms.length >= 1);
 
     const stats = forge.memoryStatus();
     assert.ok(stats.counts.entries >= 1);
@@ -186,6 +225,8 @@ test("ContextForge global memory persists wakeup entries, facts, diaries, and au
   try {
     const search = resumed.memorySearch("durable recall");
     assert.ok(search.results.some((result: any) => result.kind === "entry"));
+    const semanticSearch = resumed.memorySearch("database backend");
+    assert.ok(semanticSearch.results.some((result: any) => /SQLite/i.test(result.preview ?? result.object ?? "")));
     assert.match(resumed.memoryWakeup().text, /Memory checkpoint|SQLite memory decision|ContextForge uses SQLite/);
   } finally {
     resumed.close();

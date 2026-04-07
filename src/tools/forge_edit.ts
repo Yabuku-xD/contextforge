@@ -1,6 +1,6 @@
 export const forgeEditTool = {
   name: "forge_edit",
-  description: "Apply an exact text replacement for prompts like `replace this exact string`, `patch this block in place`, or `change this text without opening an editor`, with compact preview output.",
+  description: "Apply an exact text replacement for prompts like `replace this exact string`, `patch this block in place`, `change this text without opening an editor`, or `swap this snippet in src/foo.ts`, with compact preview output.",
   parameters: {
     path: "string",
     old_text: "string",

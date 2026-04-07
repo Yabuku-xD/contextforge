@@ -1,6 +1,6 @@
 export const forgeMemoryTimelineTool = {
   name: "forge_memory_timeline",
-  description: "Show a temporal memory timeline for prompts like `timeline of X`, `what changed over time`, or `show remembered history`.",
+  description: "Show a temporal memory timeline for prompts like `timeline of X`, `what changed over time`, `show remembered history`, or `when did this fact change`.",
   parameters: {
     entity: "string?"
   },

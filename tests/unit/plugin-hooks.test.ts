@@ -120,7 +120,10 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_scope/);
   assert.match(payload.hookSpecificOutput.additionalContext, /why does this file matter/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /what breaks if I change X/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /what touched this branch/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /rename this symbol/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /show me src\/foo\.ts/i);
+  assert.match(payload.hookSpecificOutput.additionalContext, /continue where we left off/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /show git diff without flooding chat/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /queue the eager full-repository prime in the background/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /did you read every file/i);

@@ -12,7 +12,7 @@
   session continuity, durable long-term memory, and repo-native file operations that do not flood the chat window.
 </p>
 
-[![Release](https://img.shields.io/badge/release-v0.1.51-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
+[![Release](https://img.shields.io/badge/release-v0.1.52-C2410C?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge/releases)
 [![License](https://img.shields.io/badge/license-MIT-166534?style=for-the-badge)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-22.5%2B-2563EB?style=for-the-badge)](https://nodejs.org/)
 [![Claude Code](https://img.shields.io/badge/claude%20code-marketplace-4B5563?style=for-the-badge)](https://github.com/Yabuku-xD/contextforge)
@@ -29,6 +29,7 @@
 - [How It Works](#how-it-works)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Automatic Routing](#automatic-routing)
 - [Command Reference](#command-reference)
 - [Tool Families](#tool-families)
 - [Documentation](#documentation)
@@ -51,8 +52,9 @@ The source tree now lives in `src/**/*.ts`, the hooks/tests/plugin bootstrap are
 - Reduces chat-window waste by returning compact repo digests instead of replaying broad manual crawls.
 - Gives Claude better repo memory through a persistent local index with full text-body coverage and line counts.
 - Improves targeting for search, symbol lookup, architecture questions, blast-radius analysis, and git change mapping.
+- Routes natural-language prompts like “what touched this branch”, “what role does this file play”, “show me src/foo.ts”, or “continue where we left off” onto the right `forge_*` tool more reliably.
 - Adds a low-context research lane with `forge_batch` and `forge_lookup` so logs, diffs, and command output stay indexed locally.
-- Adds a Mempalace-style layered memory stack with wake-up capsules, scoped recall, diary checkpoints, and temporal facts across sessions.
+- Adds a Mempalace-style layered memory stack with wake-up capsules, scoped recall, wing/hall/room navigation, diary checkpoints, temporal facts, and provenance-weighted hybrid retrieval across sessions.
 - Provides repo-native `forge_read`, `forge_write`, `forge_edit`, and `forge_bash` operations for smaller, more controlled tool output.
 - Supports multi-repo workflows with a registry, repo groups, graph summaries, generated artifacts, and MCP resources.
 
@@ -81,8 +83,15 @@ The source tree now lives in `src/**/*.ts`, the hooks/tests/plugin bootstrap are
 ### Durable Memory
 
 - `forge_memory_wakeup` loads compact L0/L1 wake-up memory before a new session or handoff.
-- `forge_memory_recall` and `forge_memory_search` retrieve scoped or deep memory without confusing repo index state with long-term memory.
+- `forge_memory_recall`, `forge_memory_navigate`, and `forge_memory_search` retrieve scoped or deep memory without confusing repo index state with long-term memory.
+- Memory search now blends lexical hits, local semantic embeddings, entity/topology boosts, temporal hints, and provenance weighting instead of relying on plain keyword recall.
 - `forge_memory_save`, diary tools, fact tools, and timelines store durable decisions, discoveries, and changing facts in a global SQLite memory store.
+
+### Prompt-Aware Routing
+
+- ContextForge now uses a shared prompt-signal router across startup, skills, hooks, and MCP guidance.
+- That means the explicit slash commands and the natural-language path are aligned instead of drifting apart.
+- Broad repo prompts, targeted file prompts, memory prompts, diff prompts, and shell-heavy research prompts now resolve to the same `forge_*` families more consistently.
 
 ### Multi-Repo Surfaces
 
@@ -118,6 +127,12 @@ For durable memory, the intended flow is:
 
 ```text
 forge_memory_wakeup -> forge_memory_recall / forge_memory_search -> forge_memory_save / forge_memory_fact_add / forge_memory_diary_write
+```
+
+For natural-language routing, the intended flow is:
+
+```text
+user prompt -> shared intent classifier -> best-fit forge_* tool -> compact receipt or targeted result
 ```
 
 [⬆ back to top](#readme)
@@ -192,10 +207,42 @@ node ./dist/src/cli.js doctor .
 node ./dist/src/cli.js scoreboard .
 node ./dist/src/cli.js search "checkout timeout" .
 node ./dist/src/cli.js memory-status .
+node ./dist/src/cli.js memory-navigate .
 node ./dist/src/cli.js memory-search "SQLite decision" .
 node ./dist/src/cli.js changes unstaged .
 node ./dist/src/cli.js serve .
 ```
+
+[⬆ back to top](#readme)
+
+<a id="automatic-routing"></a>
+## Automatic Routing
+
+You can call the slash commands directly, but ContextForge is meant to work well from normal prompts too.
+
+Examples:
+
+| Natural prompt | Expected tool family |
+| --- | --- |
+| `understand this repo and explain the architecture` | `forge_start` -> `forge_understand` |
+| `go through every file, folder, and subfolder in this project` | `forge_start` -> `forge_walk` |
+| `what touched this branch?` | `forge_changes` |
+| `what role does test.sh play?` | `forge_why` |
+| `what breaks if I change src/mcp-server.ts?` | `forge_impact` |
+| `show me src/contextforge.ts` | `forge_read` |
+| `replace this exact block in src/contextforge.ts` | `forge_edit` |
+| `create docs/notes.md with this content` | `forge_write` |
+| `run git status here` | `forge_bash` |
+| `run tests and summarize the failures` | `forge_batch` |
+| `search the saved logs from earlier` | `forge_lookup` |
+| `continue where we left off` | `forge_resume` |
+| `what should you remember before we continue?` | `forge_memory_wakeup` |
+| `what do you remember about auth retries?` | `forge_memory_search` |
+| `show the memory map for this project` | `forge_memory_navigate` |
+| `timeline of ContextForge versions` | `forge_memory_timeline` |
+| `make me a repo map` | `forge_map` |
+
+This routing is driven by the same shared signal extractor used by the router skill, startup classifier, RAPTOR strategy routing, and Claude hook guidance.
 
 [⬆ back to top](#readme)
 
@@ -209,7 +256,7 @@ node ./dist/src/cli.js serve .
 | Retrieval and targeting | `forge_search`, `forge_symbol`, `forge_scope`, `forge_impact`, `forge_why` |
 | Git-aware workflows | `forge_changes`, `forge_rename` |
 | Low-context research | `forge_batch`, `forge_lookup` |
-| Durable memory | `forge_memory_status`, `forge_memory_wakeup`, `forge_memory_recall`, `forge_memory_search`, `forge_memory_save`, `forge_memory_profile_set`, `forge_memory_profile_get`, `forge_memory_diary_write`, `forge_memory_diary_read`, `forge_memory_fact_add`, `forge_memory_fact_invalidate`, `forge_memory_fact_query`, `forge_memory_timeline` |
+| Durable memory | `forge_memory_status`, `forge_memory_wakeup`, `forge_memory_recall`, `forge_memory_navigate`, `forge_memory_search`, `forge_memory_save`, `forge_memory_profile_set`, `forge_memory_profile_get`, `forge_memory_diary_write`, `forge_memory_diary_read`, `forge_memory_fact_add`, `forge_memory_fact_invalidate`, `forge_memory_fact_query`, `forge_memory_timeline` |
 | Repo-native operations | `forge_read`, `forge_write`, `forge_edit`, `forge_bash` |
 | Multi-repo and generated artifacts | `forge_list_repos`, `forge_group_query`, `forge_group_status`, `forge_map`, `forge_contracts`, `forge_wiki` |
 
@@ -227,6 +274,7 @@ These are the user-facing chat commands exposed by the plugin. In normal use, na
 | `/contextforge:forge-memory-status` | Show the durable memory stack, layer counts, and whether wake-up memory is available. |
 | `/contextforge:forge-memory-wakeup` | Load the compact wake-up capsule before continuing prior work or assuming remembered context. |
 | `/contextforge:forge-memory-recall [query]` | Recall scoped memory for a topic, area, or room in the current repository. |
+| `/contextforge:forge-memory-navigate` | Explore memory wings, halls, and rooms before doing deeper long-term-memory recall. |
 | `/contextforge:forge-memory-search [query]` | Deep-search remembered entries, diary notes, and temporal facts. |
 | `/contextforge:forge-memory-save [note]` | Save a durable decision, discovery, or preference into long-term memory. |
 | `/contextforge:forge-memory-profile-set [profile]` | Save an identity or project profile into durable memory. |

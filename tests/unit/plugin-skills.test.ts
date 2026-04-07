@@ -10,6 +10,7 @@ const skillNames = [
   "forge-memory-wakeup",
   "forge-memory-recall",
   "forge-memory-search",
+  "forge-memory-navigate",
   "forge-memory-save",
   "forge-memory-profile-set",
   "forge-memory-profile-get",
@@ -90,6 +91,7 @@ test("contextforge router skill covers why, changes, rename, and research prompt
   assert.match(body, /forge_memory_status/);
   assert.match(body, /forge_memory_wakeup/);
   assert.match(body, /forge_memory_search/);
+  assert.match(body, /forge_memory_navigate/);
   assert.match(body, /forge_memory_fact_query/);
   assert.match(body, /forge_memory_timeline/);
 });

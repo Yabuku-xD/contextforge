@@ -4,6 +4,7 @@ import { forgeMemoryStatusTool } from "./forge_memory_status.js";
 import { forgeMemoryWakeupTool } from "./forge_memory_wakeup.js";
 import { forgeMemoryRecallTool } from "./forge_memory_recall.js";
 import { forgeMemorySearchTool } from "./forge_memory_search.js";
+import { forgeMemoryNavigateTool } from "./forge_memory_navigate.js";
 import { forgeMemorySaveTool } from "./forge_memory_save.js";
 import { forgeMemoryProfileSetTool } from "./forge_memory_profile_set.js";
 import { forgeMemoryProfileGetTool } from "./forge_memory_profile_get.js";
@@ -47,6 +48,7 @@ export const TOOL_REGISTRY = {
   forge_memory_wakeup: forgeMemoryWakeupTool,
   forge_memory_recall: forgeMemoryRecallTool,
   forge_memory_search: forgeMemorySearchTool,
+  forge_memory_navigate: forgeMemoryNavigateTool,
   forge_memory_save: forgeMemorySaveTool,
   forge_memory_profile_set: forgeMemoryProfileSetTool,
   forge_memory_profile_get: forgeMemoryProfileGetTool,

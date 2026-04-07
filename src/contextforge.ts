@@ -27,7 +27,7 @@ import { buildResumeSummary } from "./session/resume.js";
 import { searchSessionEvents } from "./session/search.js";
 import { classifyContent } from "./router/classify-content.js";
 import { decideRoute } from "./router/bypass-policy.js";
-import { extractQuerySignals } from "./router/query-signals.js";
+import { extractQuerySignals, recommendForgeTool } from "./router/query-signals.js";
 import { safeCompress } from "./compression/safe-compress.js";
 import { createPage, touchPage } from "./pager/pages.js";
 import { noteFault, retrievalHandle } from "./pager/page-faults.js";
@@ -65,6 +65,7 @@ import {
   getMemoryStats,
   invalidateMemoryFact,
   listMemoryProfiles,
+  navigateMemory as loadMemoryNavigate,
   memoryTimeline as loadMemoryTimeline,
   queryMemoryFacts,
   readDiaryEntries,
@@ -397,6 +398,16 @@ export class ContextForge {
     });
   }
 
+  memoryNavigate(options: Record<string, any> = {}) {
+    return loadMemoryNavigate(this.memoryDb, {
+      repoId: coerceBoolean(options.global, false) ? null : this.repoId,
+      wing: options.wing ?? this._repoDisplayName(),
+      hall: options.hall,
+      room: options.room,
+      limit: options.limit
+    });
+  }
+
   memorySave(input: Record<string, any> = {}) {
     const entry = storeMemoryEntry(this.memoryDb, {
       scope: input.scope ?? "repo",
@@ -606,6 +617,8 @@ export class ContextForge {
 
   startup(message) {
     const task = classifyStartup(message);
+    const routingSignals = extractQuerySignals(message);
+    const routingRecommendation = recommendForgeTool(routingSignals);
     let index;
     try {
       index = this._shouldDeferStartupPrime(task)
@@ -689,6 +702,10 @@ export class ContextForge {
     return {
       index,
       task,
+      routing: {
+        recommendedNextTool: routingRecommendation.tool,
+        recommendedReason: routingRecommendation.reason
+      },
       memory: {
         enabled: true,
         repoName: this._repoDisplayName(),
@@ -3101,8 +3118,25 @@ export class ContextForge {
 
   _startupPreloadPlan(message, task) {
     const lowered = String(message ?? "").toLowerCase();
-    const broadExplore = /\b(project structure|repo structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|monorepo|package|packages|folder|folders|subfolder|subfolders|directory|directories|overview|understand)\b/.test(lowered);
-    const deepExplore = /\b(every single file|every file|all files|all folders|all directories|subfolder|subfolders|walk the repo|walk the project|go through every|go through each|comprehensive understanding|entire monorepo)\b/.test(lowered);
+    const signals = extractQuerySignals(message);
+    const recommendation = recommendForgeTool(signals);
+    const broadExplore = signals.broadRepo || /\b(project structure|repo structure|whole project|entire repo|entire repository|full codebase|all files|every file|every single file|comprehensive|monorepo|package|packages|folder|folders|subfolder|subfolders|directory|directories|overview|understand)\b/.test(lowered);
+    const deepExplore = signals.exhaustive || /\b(every single file|every file|all files|all folders|all directories|subfolder|subfolders|walk the repo|walk the project|go through every|go through each|comprehensive understanding|entire monorepo)\b/.test(lowered);
+    const defaultToolSchema = deepExplore
+      ? "forge_walk"
+      : broadExplore
+        ? "forge_scan"
+        : recommendation.tool === "forge_resume"
+          ? "forge_resume"
+          : recommendation.tool.startsWith("forge_memory_")
+            ? recommendation.tool
+            : recommendation.tool === "forge_bash" || recommendation.tool === "forge_batch" || recommendation.tool === "forge_lookup"
+              ? recommendation.tool
+              : recommendation.tool === "forge_read" || recommendation.tool === "forge_edit" || recommendation.tool === "forge_write"
+                ? recommendation.tool
+                : recommendation.tool === "forge_search" || recommendation.tool === "forge_symbol" || recommendation.tool === "forge_scope" || recommendation.tool === "forge_impact" || recommendation.tool === "forge_changes" || recommendation.tool === "forge_rename" || recommendation.tool === "forge_why"
+                  ? recommendation.tool
+                  : "forge_tools";
     if (task.loadStrategy === "minimal") {
       return {
         name: "minimal_brief",
@@ -3115,9 +3149,16 @@ export class ContextForge {
     if (task.loadStrategy === "light") {
       return {
         name: broadExplore ? "light_understand_bundle" : "light_tool_bundle",
-        toolSchemas: [deepExplore ? "forge_walk" : broadExplore ? "forge_scan" : "forge_tools"],
+        toolSchemas: [defaultToolSchema],
         toolBudget: 120,
-        preloads: broadExplore
+        preloads: recommendation.tool.startsWith("forge_memory_")
+          ? [{
+              pageType: "memory_pack",
+              sourceItemType: "module",
+              sourceItemId: "memory_hints",
+              sizeEstimate: 56
+            }]
+          : broadExplore
           ? [{
               pageType: "overview_pack",
               sourceItemType: "module",
@@ -3135,10 +3176,12 @@ export class ContextForge {
       };
     }
 
-    const needsSession = /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
+    const needsSession = recommendation.tool === "forge_resume"
+      || recommendation.tool.startsWith("forge_memory_")
+      || /\bsame bug\b|\bundo\b|\byesterday\b|\bsession\b|\bdecision\b|\bwhy\b|\bwhat changed\b/.test(lowered);
     return {
       name: needsSession ? "full_session_pack" : broadExplore ? "full_understand_pack" : "full_repo_pack",
-      toolSchemas: [deepExplore ? "forge_walk" : broadExplore ? "forge_scan" : "forge_tools"],
+      toolSchemas: [defaultToolSchema],
       toolBudget: 108,
       preloads: needsSession
         ? [{

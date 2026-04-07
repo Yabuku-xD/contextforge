@@ -1,6 +1,6 @@
 export const forgeSymbolTool = {
   name: "forge_symbol",
-  description: "Find exact or fuzzy symbols for prompts like `where is function X defined`, `show me the Foo class`, `find symbol named bar`, or `jump to this identifier`.",
+  description: "Find exact or fuzzy symbols for prompts like `where is function X defined`, `show me the Foo class`, `find symbol named bar`, `jump to this identifier`, `where is createCheckout`, or `take me to the definition of this method`.",
   parameters: { query: "string", limit: "number?" },
   execute(forge: any, args: any = {}) {
     return forge.symbol(args.query ?? "", { limit: normalizeLimit(args.limit) });

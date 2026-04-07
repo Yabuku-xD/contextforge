@@ -37,6 +37,18 @@ export function registerContextForgeResources(server: any, forge: any): void {
     }]
   }));
 
+  server.registerResource("contextforge-memory-navigate", "contextforge://memory/navigate", {
+    title: "ContextForge Memory Navigate",
+    description: "Wing, hall, and room topology for durable memory navigation.",
+    mimeType: "application/json"
+  }, async () => ({
+    contents: [{
+      uri: "contextforge://memory/navigate",
+      mimeType: "application/json",
+      text: JSON.stringify(forge.memoryNavigate(), null, 2)
+    }]
+  }));
+
   const repoResources: any[] = [
     ["contextforge-overview", "contextforge://repo/overview", "ContextForge Repo Overview", "Top-level repository overview and index status.", () => forge.scan("repo overview")],
     ["contextforge-areas", "contextforge://repo/areas", "ContextForge Areas", "Derived package and directory areas from the repository graph.", () => forge.areas()],

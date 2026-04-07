@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS memory_entries (
   summary TEXT NOT NULL,
   detail TEXT NOT NULL,
   aaak TEXT,
+  semantic_json TEXT NOT NULL DEFAULT '{}',
+  embedding_json TEXT NOT NULL DEFAULT '[]',
   tags_json TEXT NOT NULL DEFAULT '[]',
   importance REAL NOT NULL DEFAULT 0.5,
   source_type TEXT NOT NULL DEFAULT 'manual',
@@ -71,6 +73,7 @@ CREATE TABLE IF NOT EXISTS memory_triples (
   valid_to TEXT,
   confidence REAL NOT NULL DEFAULT 1.0,
   metadata_json TEXT NOT NULL DEFAULT '{}',
+  embedding_json TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch())
 );
@@ -87,6 +90,8 @@ CREATE TABLE IF NOT EXISTS memory_diaries (
   title TEXT NOT NULL,
   entry_text TEXT NOT NULL,
   aaak TEXT,
+  semantic_json TEXT NOT NULL DEFAULT '{}',
+  embedding_json TEXT NOT NULL DEFAULT '[]',
   tags_json TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER DEFAULT (unixepoch())
 );

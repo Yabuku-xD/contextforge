@@ -36,6 +36,7 @@ const additionalContext = `
   - forge_memory_status: show the long-term memory stack, counts, and layer availability
   - forge_memory_wakeup: load the compact wake-up capsule before assuming prior decisions, identity, or project history
   - forge_memory_recall: scoped topic recall for the current repo, hall, or room
+  - forge_memory_navigate: inspect memory wings, halls, rooms, and local memory topology
   - forge_memory_search: deep-search memory entries, diaries, and remembered facts
   - forge_memory_save: save durable discoveries, decisions, and preferences
   - forge_memory_profile_set / forge_memory_profile_get: set or inspect identity/project memory profiles
@@ -46,16 +47,22 @@ const additionalContext = `
   Prompt routing examples:
   - "why does this file matter", "what is this for", "why is this important": forge_why
   - "what breaks if I change X", "who depends on this", "what else is affected": forge_impact
-  - "what changed on this branch", "summarize the diff", "map these changes": forge_changes
+  - "what changed on this branch", "summarize the diff", "map these changes", "what touched this branch", "what did this commit change": forge_changes
   - "rename this symbol", "rename this API across the repo": forge_rename
   - "where is function/class X", "find symbol Foo": forge_symbol
   - "find where behavior Y is implemented", "which file handles Z": forge_search
   - "how is this area structured", "which modules talk to each other": forge_scope
+  - "show me src/foo.ts", "open package.json", "read this file", "list this folder": forge_read
+  - "replace this exact block in src/foo.ts", "patch this string in place": forge_edit
+  - "create docs/notes.md", "overwrite this file with new content": forge_write
+  - "run git status", "execute pwd here", "run this small repo command": forge_bash
   - "run tests and summarize", "inspect these logs", "show git diff without flooding chat": forge_batch
   - "search the saved logs from earlier", "find the error in that stored output": forge_lookup
   - "make me a repo map", "generate the repo wiki", "show integration contracts": forge_map, forge_wiki, forge_contracts
   - "what repos are registered", "search across grouped repos": forge_list_repos, forge_group_query, forge_group_status
+  - "continue where we left off", "pick up the previous session": forge_resume
   - "what should you remember before we continue", "load prior decisions", "wake up memory": forge_memory_wakeup
+  - "show the memory map", "what rooms exist", "navigate project memory": forge_memory_navigate
   - "remember this", "save this decision", "store this long-term": forge_memory_save
   - "what do you remember about X", "search remembered notes", "verify this remembered fact": forge_memory_search or forge_memory_fact_query
   - "timeline of X", "what changed over time": forge_memory_timeline

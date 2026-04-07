@@ -105,6 +105,247 @@ const PINPOINT_PHRASES = [
   "what breaks if"
 ];
 
+const WHY_PHRASES = [
+  "why does this file matter",
+  "why does this matter",
+  "why is this important",
+  "what is this for",
+  "what's this for",
+  "what is the purpose of",
+  "why does this exist",
+  "why was this added",
+  "what does this do",
+  "what is the role of",
+  "why do we have this",
+  "what is responsible for"
+];
+
+const IMPACT_PHRASES = [
+  "what breaks if",
+  "what else is affected",
+  "who depends on",
+  "who uses this",
+  "what uses this",
+  "blast radius",
+  "impact of",
+  "affected by this",
+  "downstream impact",
+  "upstream impact"
+];
+
+const CHANGES_PHRASES = [
+  "what changed",
+  "what's changed",
+  "summarize the diff",
+  "summarise the diff",
+  "show the diff",
+  "map these changes",
+  "review the changes",
+  "what changed on this branch",
+  "what touched this branch",
+  "which files changed",
+  "what did this commit touch",
+  "what was modified",
+  "changed on this branch"
+];
+
+const RENAME_PHRASES = [
+  "rename this symbol",
+  "rename this api",
+  "rename across the repo",
+  "rename across repo",
+  "rename throughout the repo",
+  "rename this across the codebase",
+  "rename this class",
+  "rename this function",
+  "rename this method",
+  "rename this variable",
+  "rename "
+];
+
+const SCOPE_PHRASES = [
+  "how is this area structured",
+  "how is this project structured",
+  "which modules talk to each other",
+  "which module talk to each other",
+  "how do these modules fit together",
+  "how do these module fit together",
+  "how does this area fit together",
+  "show the flow between",
+  "show the architecture of",
+  "show the wiring",
+  "how do these parts interact",
+  "relationship between"
+];
+
+const MEMORY_WAKEUP_PHRASES = [
+  "what should you remember",
+  "load prior decisions",
+  "wake up memory",
+  "before we continue",
+  "before we move on",
+  "what should i know before continuing",
+  "remind yourself"
+];
+
+const MEMORY_SAVE_PHRASES = [
+  "remember this",
+  "save this decision",
+  "store this long term",
+  "store this long-term",
+  "save this long term",
+  "save this long-term",
+  "don't forget this",
+  "keep this in mind",
+  "persist this memory"
+];
+
+const MEMORY_SEARCH_PHRASES = [
+  "what do you remember about",
+  "search memory",
+  "search remembered",
+  "search past notes",
+  "find past notes",
+  "verify this remembered fact",
+  "did we decide",
+  "what did we decide",
+  "what have we said before",
+  "what do you recall about"
+];
+
+const MEMORY_NAVIGATE_PHRASES = [
+  "memory map",
+  "memory rooms",
+  "memory wings",
+  "memory halls",
+  "navigate memory",
+  "show the memory layout",
+  "show the memory topology"
+];
+
+const MEMORY_TIMELINE_PHRASES = [
+  "timeline of",
+  "what changed over time",
+  "history of",
+  "when did this change",
+  "sequence of remembered",
+  "remembered history"
+];
+
+const LOOKUP_PHRASES = [
+  "search the logs from earlier",
+  "search the saved logs from earlier",
+  "saved test output",
+  "stored output",
+  "from earlier logs",
+  "from the earlier batch",
+  "previous command results",
+  "that stored output",
+  "saved output from before"
+];
+
+const BATCH_PHRASES = [
+  "run tests and summarize",
+  "inspect logs",
+  "check ci output",
+  "summarize the failures",
+  "show git diff without flooding chat",
+  "collect command output",
+  "inspect this log output",
+  "summarize test output"
+];
+
+const READ_WORDS = [
+  "read",
+  "open",
+  "show",
+  "display",
+  "peek",
+  "view",
+  "cat",
+  "print",
+  "list"
+];
+
+const EDIT_WORDS = [
+  "replace",
+  "patch",
+  "edit",
+  "update",
+  "change",
+  "swap",
+  "rewrite"
+];
+
+const WRITE_WORDS = [
+  "create",
+  "write",
+  "overwrite",
+  "save file",
+  "new file",
+  "replace the full file"
+];
+
+const RESUME_PHRASES = [
+  "continue where we left off",
+  "resume the session",
+  "pick up where we left off",
+  "load the last session",
+  "continue the previous work",
+  "resume prior work"
+];
+
+const ARTIFACT_MAP_PHRASES = [
+  "repo map",
+  "repository map",
+  "project map",
+  "architecture map",
+  "map of the repo",
+  "map of the repository"
+];
+
+const ARTIFACT_WIKI_PHRASES = [
+  "repo wiki",
+  "repository wiki",
+  "project wiki",
+  "generate the wiki",
+  "living wiki"
+];
+
+const ARTIFACT_CONTRACT_PHRASES = [
+  "integration contracts",
+  "show the contracts",
+  "cross area contracts",
+  "cross-area contracts"
+];
+
+const LIST_REPOS_PHRASES = [
+  "what repos are registered",
+  "what repository are registered",
+  "list registered repos",
+  "list registered repository",
+  "show registered repositories",
+  "show registered repository",
+  "which repos do you know about"
+];
+
+const GROUP_QUERY_PHRASES = [
+  "search across grouped repos",
+  "search across grouped repository",
+  "query across grouped repos",
+  "query across grouped repository",
+  "search across repo group",
+  "query across repo group"
+];
+
+const GROUP_STATUS_PHRASES = [
+  "group status",
+  "status across grouped repos",
+  "status across grouped repository",
+  "repo group status",
+  "status of the repo group"
+];
+
 const EXACT_HINT_WORDS = [
   "symbol",
   "function",
@@ -157,6 +398,7 @@ const NEGATION_TOKENS = [
 // Explicit path-like tokens (src/foo, tests/bar/baz.ts) signal a scoped request
 // that should downgrade "exhaustive" intent to "targeted".
 const PATH_SHAPE = /\b[a-z0-9_.\-]+\/[a-z0-9_./\-]+/gi;
+const FILE_HINT_SHAPE = /\b(?=[a-z0-9._-]*[a-z])[a-z0-9._-]+\.[a-z0-9._-]+\b/gi;
 
 // Identifier shapes that hint at an exact-symbol query even without an explicit
 // "symbol"/"function" keyword: CamelCase, snake_case, dotted, arrow/paren.
@@ -203,6 +445,10 @@ function tokenize(text: string): string[] {
   return text.split(/\s+/).filter(Boolean);
 }
 
+function unique<T>(items: T[]): T[] {
+  return [...new Set(items)];
+}
+
 function containsAny(text: string, needles: string[]): boolean {
   for (const needle of needles) {
     if (!needle) continue;
@@ -239,8 +485,31 @@ export type QuerySignals = {
   pinpoint: boolean;
   exactSymbol: boolean;
   outputHeavy: boolean;
+  shellIntent: boolean;
   broadDiscovery: boolean;
   negation: boolean;
+  intentWhy: boolean;
+  intentImpact: boolean;
+  intentChanges: boolean;
+  intentRename: boolean;
+  intentScope: boolean;
+  intentMemoryWakeup: boolean;
+  intentMemorySave: boolean;
+  intentMemorySearch: boolean;
+  intentMemoryNavigate: boolean;
+  intentMemoryTimeline: boolean;
+  intentLookup: boolean;
+  intentBatch: boolean;
+  intentRead: boolean;
+  intentEdit: boolean;
+  intentWrite: boolean;
+  intentResume: boolean;
+  intentMap: boolean;
+  intentWiki: boolean;
+  intentContracts: boolean;
+  intentListRepos: boolean;
+  intentGroupQuery: boolean;
+  intentGroupStatus: boolean;
   scopeHints: string[];
   complexityScore: number;
 };
@@ -262,10 +531,44 @@ export function extractQuerySignals(input: unknown): QuerySignals {
     IDENTIFIER_SHAPE.test(raw);
 
   const outputHeavy = matchesAny(raw, OUTPUT_HEAVY_COMMANDS);
+  const shellIntent =
+    /\b(run|execute)\b/.test(normalized) ||
+    /\b(git|npm|pnpm|yarn|pytest|cargo|go|node|deno|bun|ls|pwd|cat|find|tree|rg|grep)\b/.test(normalized);
   const broadDiscovery = matchesAny(raw, BROAD_DISCOVERY_COMMANDS);
 
-  const scopeHints = Array.from(raw.matchAll(PATH_SHAPE)).map((match) => match[0]);
+  const scopeHints = unique([
+    ...Array.from(raw.matchAll(PATH_SHAPE)).map((match) => match[0]),
+    ...Array.from(raw.matchAll(FILE_HINT_SHAPE)).map((match) => match[0])
+  ]);
   const negation = containsAny(normalized, NEGATION_TOKENS);
+  const intentWhy =
+    containsAny(normalized, WHY_PHRASES) ||
+    /\bwhy\b/.test(normalized) ||
+    /\bwhat role does\b/.test(normalized) ||
+    /\bwhat does this\b.*\bdo\b/.test(normalized);
+  const intentImpact = containsAny(normalized, IMPACT_PHRASES);
+  const intentChanges = containsAny(normalized, CHANGES_PHRASES);
+  const intentRename = containsAny(normalized, RENAME_PHRASES);
+  const intentScope =
+    containsAny(normalized, SCOPE_PHRASES) ||
+    /\barchitecture\b|\bflow\b|\bwiring\b|\binteract\b|\bfit together\b/.test(normalized);
+  const intentMemoryWakeup = containsAny(normalized, MEMORY_WAKEUP_PHRASES);
+  const intentMemorySave = containsAny(normalized, MEMORY_SAVE_PHRASES);
+  const intentMemorySearch = containsAny(normalized, MEMORY_SEARCH_PHRASES);
+  const intentMemoryNavigate = containsAny(normalized, MEMORY_NAVIGATE_PHRASES);
+  const intentMemoryTimeline = containsAny(normalized, MEMORY_TIMELINE_PHRASES);
+  const intentLookup = containsAny(normalized, LOOKUP_PHRASES);
+  const intentBatch = containsAny(normalized, BATCH_PHRASES);
+  const intentResume = containsAny(normalized, RESUME_PHRASES);
+  const intentMap = containsAny(normalized, ARTIFACT_MAP_PHRASES);
+  const intentWiki = containsAny(normalized, ARTIFACT_WIKI_PHRASES);
+  const intentContracts = containsAny(normalized, ARTIFACT_CONTRACT_PHRASES);
+  const intentListRepos = containsAny(normalized, LIST_REPOS_PHRASES);
+  const intentGroupQuery = containsAny(normalized, GROUP_QUERY_PHRASES);
+  const intentGroupStatus = containsAny(normalized, GROUP_STATUS_PHRASES);
+  const intentRead = scopeHints.length > 0 && containsAny(normalized, READ_WORDS);
+  const intentEdit = scopeHints.length > 0 && containsAny(normalized, EDIT_WORDS);
+  const intentWrite = scopeHints.length > 0 && containsAny(normalized, WRITE_WORDS);
 
   // "exhaustive" = explicit ask to cover the whole repo.
   // Requires (broad scope word + file-tree word) OR ("walk"/"audit" + repo target)
@@ -314,8 +617,31 @@ export function extractQuerySignals(input: unknown): QuerySignals {
     pinpoint,
     exactSymbol,
     outputHeavy,
+    shellIntent,
     broadDiscovery,
     negation,
+    intentWhy,
+    intentImpact,
+    intentChanges,
+    intentRename,
+    intentScope,
+    intentMemoryWakeup,
+    intentMemorySave,
+    intentMemorySearch,
+    intentMemoryNavigate,
+    intentMemoryTimeline,
+    intentLookup,
+    intentBatch,
+    intentRead,
+    intentEdit,
+    intentWrite,
+    intentResume,
+    intentMap,
+    intentWiki,
+    intentContracts,
+    intentListRepos,
+    intentGroupQuery,
+    intentGroupStatus,
     scopeHints,
     complexityScore
   };
@@ -327,6 +653,48 @@ export function recommendForgeTool(signals: QuerySignals): {
   tool: string;
   reason: string;
 } {
+  if (signals.intentResume) {
+    return { tool: "forge_resume", reason: "resume_prior_work" };
+  }
+  if (signals.intentMemorySave) {
+    return { tool: "forge_memory_save", reason: "save_durable_memory" };
+  }
+  if (signals.intentMemoryWakeup) {
+    return { tool: "forge_memory_wakeup", reason: "load_wakeup_memory" };
+  }
+  if (signals.intentMemoryNavigate) {
+    return { tool: "forge_memory_navigate", reason: "navigate_memory_topology" };
+  }
+  if (signals.intentMemoryTimeline) {
+    return { tool: "forge_memory_timeline", reason: "memory_timeline_request" };
+  }
+  if (signals.intentMemorySearch) {
+    return { tool: "forge_memory_search", reason: "search_long_term_memory" };
+  }
+  if (signals.intentLookup) {
+    return { tool: "forge_lookup", reason: "search_saved_research_output" };
+  }
+  if (signals.intentBatch) {
+    return { tool: "forge_batch", reason: "log_or_test_research_request" };
+  }
+  if (signals.intentListRepos) {
+    return { tool: "forge_list_repos", reason: "list_registered_repositories" };
+  }
+  if (signals.intentGroupQuery) {
+    return { tool: "forge_group_query", reason: "query_repo_group" };
+  }
+  if (signals.intentGroupStatus) {
+    return { tool: "forge_group_status", reason: "repo_group_status" };
+  }
+  if (signals.intentContracts) {
+    return { tool: "forge_contracts", reason: "generate_contract_view" };
+  }
+  if (signals.intentWiki) {
+    return { tool: "forge_wiki", reason: "generate_repo_wiki" };
+  }
+  if (signals.intentMap) {
+    return { tool: "forge_map", reason: "generate_repo_map" };
+  }
   if (signals.broadDiscovery) {
     return { tool: "forge_scan", reason: "broad_discovery_command" };
   }
@@ -336,14 +704,41 @@ export function recommendForgeTool(signals: QuerySignals): {
   if (signals.broadRepo && !signals.negation) {
     return { tool: "forge_understand", reason: "broad_repo_understanding" };
   }
+  if (signals.intentRename) {
+    return { tool: "forge_rename", reason: "coordinated_rename_request" };
+  }
+  if (signals.intentChanges) {
+    return { tool: "forge_changes", reason: "git_change_mapping" };
+  }
+  if (signals.intentWhy) {
+    return { tool: "forge_why", reason: "why_or_purpose_query" };
+  }
+  if (signals.intentImpact) {
+    return { tool: "forge_impact", reason: "blast_radius_query" };
+  }
   if (signals.exactSymbol) {
     return { tool: "forge_symbol", reason: "exact_symbol_query" };
+  }
+  if (signals.intentScope) {
+    return { tool: "forge_scope", reason: "structure_or_relationship_query" };
+  }
+  if (signals.intentWrite) {
+    return { tool: "forge_write", reason: "path_scoped_write_request" };
+  }
+  if (signals.intentEdit) {
+    return { tool: "forge_edit", reason: "path_scoped_edit_request" };
+  }
+  if (signals.intentRead) {
+    return { tool: "forge_read", reason: "path_scoped_read_request" };
   }
   if (signals.pinpoint) {
     return { tool: "forge_impact", reason: "pinpoint_blast_radius" };
   }
   if (signals.outputHeavy) {
     return { tool: "forge_batch", reason: "output_heavy_shell" };
+  }
+  if (signals.shellIntent) {
+    return { tool: "forge_bash", reason: "repo_local_shell_request" };
   }
   return { tool: "forge_search", reason: "default_search" };
 }
