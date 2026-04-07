@@ -2,7 +2,7 @@ import http from "node:http";
 import { URL } from "node:url";
 import { createContextForge } from "../contextforge.js";
 
-export async function startBridgeServer(rootDir: string, options: Record<string, any> = {}) {
+export async function startBridgeServer(rootDir: string, options: Record<string, any> = {}): Promise<any> {
   const host = options.host ?? "127.0.0.1";
   const port = normalizePort(options.port);
   const forge = createContextForge(rootDir, options.sessionId ? { sessionId: options.sessionId } : {});

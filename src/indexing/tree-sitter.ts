@@ -24,7 +24,7 @@ function parserFor(language, filePath) {
   return PARSERS.get(language);
 }
 
-export function parseSource({ language, filePath, content }) {
+export function parseSource({ language, filePath, content }): any {
   const parser = parserFor(language, filePath);
   if (!parser) {
     return null;

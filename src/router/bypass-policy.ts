@@ -20,7 +20,7 @@ const SAFE_TYPES = new Set([
   "prose_doc"
 ]);
 
-export function decideRoute(contentType) {
+export function decideRoute(contentType): string {
   if (EXACT_TYPES.has(contentType)) {
     return "exact";
   }

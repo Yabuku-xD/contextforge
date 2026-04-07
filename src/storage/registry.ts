@@ -113,7 +113,7 @@ function pruneRegistryState() {
   return { repos, roots };
 }
 
-export function listRegisteredRepositories(options: Record<string, any> = {}) {
+export function listRegisteredRepositories(options: Record<string, any> = {}): any[] {
   const includePaths = Boolean(options.includePaths);
   const { repos, roots } = pruneRegistryState();
   const rootByRepoId = new Map(roots.map((entry) => [entry.repoId, entry.rootPath]));
@@ -125,7 +125,7 @@ export function listRegisteredRepositories(options: Record<string, any> = {}) {
     : repo);
 }
 
-export function registerIndexedRepository(repo) {
+export function registerIndexedRepository(repo): any {
   const { repos: existingRepos, roots: existingRoots } = pruneRegistryState();
   const nextRepo = {
     name: repo.name,
@@ -159,7 +159,7 @@ export function registerIndexedRepository(repo) {
   return nextRepo;
 }
 
-export function resolveRegisteredRepository(repoRef) {
+export function resolveRegisteredRepository(repoRef): any {
   const normalized = String(repoRef ?? "").trim();
   if (!normalized) {
     return null;
@@ -173,7 +173,7 @@ export function resolveRegisteredRepository(repoRef) {
   ) ?? null;
 }
 
-export function listRepoGroups(name = null) {
+export function listRepoGroups(name = null): any {
   const payload = readJson(groupsFile(), { groups: [] });
   const groups = Array.isArray(payload.groups) ? payload.groups : [];
   const normalizedGroups = groups.map((group) => ({
@@ -195,7 +195,7 @@ export function listRepoGroups(name = null) {
   return normalizedGroups.find((group) => group.name === name) ?? null;
 }
 
-export function createRepoGroup(name) {
+export function createRepoGroup(name): any {
   const normalized = normalizeGroupName(name);
   const groups = listRepoGroups();
   const existing = groups.find((group) => group.name === normalized);
@@ -215,7 +215,7 @@ export function createRepoGroup(name) {
   return created;
 }
 
-export function addRepoToGroup(name, repoRef) {
+export function addRepoToGroup(name, repoRef): any {
   const normalized = normalizeGroupName(name);
   const repo = typeof repoRef === "string" ? resolveRegisteredRepository(repoRef) : repoRef;
   if (!repo) {
@@ -248,7 +248,7 @@ export function addRepoToGroup(name, repoRef) {
   return updated;
 }
 
-export function removeRepoFromGroup(name, repoRef) {
+export function removeRepoFromGroup(name, repoRef): any {
   const normalized = normalizeGroupName(name);
   const repo = typeof repoRef === "string" ? resolveRegisteredRepository(repoRef) : repoRef;
   const groups = listRepoGroups();

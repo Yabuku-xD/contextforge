@@ -5,7 +5,7 @@ const TRIVIAL_PATTERNS = [
   /^\s*what time is it\??\s*$/i
 ];
 
-export function classifyTask(message) {
+export function classifyTask(message): { label: string; confidence: number; reason: string } {
   const text = String(message ?? "").trim();
   if (!text) {
     return { label: "trivial", confidence: 1, reason: "empty_input" };

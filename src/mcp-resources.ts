@@ -1,6 +1,6 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-export function registerContextForgeResources(server: any, forge: any) {
+export function registerContextForgeResources(server: any, forge: any): void {
   server.registerResource("contextforge-registry-repos", "contextforge://repos", {
     title: "ContextForge Registered Repositories",
     description: "Global registry of repositories indexed by ContextForge.",

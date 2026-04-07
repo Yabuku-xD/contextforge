@@ -1,6 +1,6 @@
 import { tokenize } from "../utils/text.js";
 
-export function bm25Search(db, query, limit = 10) {
+export function bm25Search(db, query, limit = 10): any[] {
   const matchQuery = toFtsMatchQuery(query);
   if (!matchQuery) {
     return [];

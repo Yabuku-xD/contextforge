@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isDatabaseLockError, openDatabase } from "./storage/db.js";
-import { loadRepositoryFile, loadRepositoryInventory, loadRepositoryInventoryEntry } from "./indexing/files.js";
+import { loadRepositoryFile, loadRepositoryInventory } from "./indexing/files.js";
 import { parseSource } from "./indexing/tree-sitter.js";
 import { extractSymbols } from "./indexing/symbols.js";
 import { createFallbackFileArtifacts } from "./indexing/parser-fallback.js";
@@ -4157,11 +4157,11 @@ export class ContextForge {
   }
 }
 
-export function createContextForge(rootDir: string, options: Record<string, any> = {}) {
+export function createContextForge(rootDir: string, options: Record<string, any> = {}): any {
   return new ContextForge(rootDir, options);
 }
 
-export function pageHint(label, toolHint) {
+export function pageHint(label, toolHint): string {
   return retrievalHandle({ label, toolHint });
 }
 

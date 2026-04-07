@@ -37,14 +37,14 @@ function withHookForge<T>(
   }
 }
 
-export function runSessionStart(rootDir: string, message: string, options: Record<string, any> = {}) {
+export function runSessionStart(rootDir: string, message: string, options: Record<string, any> = {}): any {
   return withHookForge(rootDir, options.sessionId, "session-start", false, (forge) => ({
     ...forge.startup(message),
     sessionId: forge.sessionId
   }));
 }
 
-export async function runPreToolUse(rootDir: string, content: string, metadata: Record<string, any> = {}) {
+export async function runPreToolUse(rootDir: string, content: string, metadata: Record<string, any> = {}): Promise<any> {
   return withHookForge(rootDir, metadata.sessionId, "pre-tool-use", true, async (forge) => ({
     ...(await forge.processArtifact(content, metadata)),
     sessionId: forge.sessionId
@@ -56,7 +56,7 @@ export function runPostToolUse(
   eventType: string,
   payload: Record<string, any> = {},
   options: Record<string, any> = {}
-) {
+): any {
   return withHookForge(rootDir, options.sessionId, "post-tool-use", true, (forge) => {
     recordSessionEvent(forge.db, {
       repoId: forge.repoId,
@@ -68,7 +68,7 @@ export function runPostToolUse(
   });
 }
 
-export function runPreCompact(rootDir: string, options: Record<string, any> = {}) {
+export function runPreCompact(rootDir: string, options: Record<string, any> = {}): any {
   return withHookForge(rootDir, options.sessionId, "pre-compact", true, (forge) => ({
     ...forge.resume(),
     sessionId: forge.sessionId

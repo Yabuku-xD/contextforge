@@ -13,7 +13,7 @@ const VENDORED_PATTERNS = [
   /\/third_party\//
 ];
 
-export function classifyFileOrigin(filePath) {
+export function classifyFileOrigin(filePath): { isGenerated: boolean; isVendor: boolean } {
   return {
     isGenerated: GENERATED_PATTERNS.some((pattern) => pattern.test(filePath)),
     isVendor: VENDORED_PATTERNS.some((pattern) => pattern.test(filePath))

@@ -10,7 +10,7 @@ export function buildAreaCatalog({
   symbols = [],
   edges = [],
   entrypoints = []
-}) {
+}): any[] {
   const symbolCountByFile = new Map();
   const edgeCountByFile = new Map();
 
@@ -94,7 +94,7 @@ export function buildFlowCatalog({
   symbols = [],
   edges = [],
   entrypoints = []
-}) {
+}): any[] {
   const fileByPath = new Map(files.map((file) => [file.relativePath, file]));
   const symbolsByFileId = new Map();
   const symbolById = new Map(symbols.map((symbol) => [symbol.symbolId, symbol]));
@@ -200,7 +200,7 @@ export function buildGraphSchemaSummary({
   edges = [],
   areas = [],
   flows = []
-}) {
+}): any {
   const edgeTypeCounts = new Map();
   for (const edge of edges) {
     edgeTypeCounts.set(edge.edgeType, (edgeTypeCounts.get(edge.edgeType) ?? 0) + 1);

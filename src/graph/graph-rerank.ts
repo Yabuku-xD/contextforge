@@ -2,7 +2,7 @@ import { personalizedPageRank } from "./pagerank.js";
 import { resolveAliasSeeds } from "./alias-resolution.js";
 import { tokenize } from "../utils/text.js";
 
-export function rerankWithGraph({ query, results, repoGraph, symbols }: any) {
+export function rerankWithGraph({ query, results, repoGraph, symbols }: any): any[] {
   const seeds = resolveAliasSeeds(query, symbols, 6);
   if (!seeds.length) {
     return results;

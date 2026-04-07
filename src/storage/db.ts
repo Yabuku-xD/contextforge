@@ -2,7 +2,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { readText, ensureDir } from "../utils/fs.js";
 
-export function openDatabase(rootDir) {
+export function openDatabase(rootDir): any {
   const dataDir = path.join(rootDir, ".contextforge");
   ensureDir(dataDir);
   const dbPath = path.join(dataDir, "contextforge.db");
@@ -52,7 +52,7 @@ export function openDatabase(rootDir) {
   return db;
 }
 
-export function isDatabaseLockError(error) {
+export function isDatabaseLockError(error): boolean {
   return error?.errcode === 5 ||
     error?.errcode === 261 ||
     (error?.code === "ERR_SQLITE_ERROR" && /database is locked/i.test(String(error?.message ?? "")));

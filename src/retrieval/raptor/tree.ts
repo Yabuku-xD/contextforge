@@ -2,7 +2,7 @@ import path from "node:path";
 import { makeId } from "../../indexing/canonicalize.js";
 import { summarizeChildren } from "./summaries.js";
 
-export function buildRaptorTree({ repoId, files, symbols }) {
+export function buildRaptorTree({ repoId, files, symbols }): any[] {
   const nodes = [];
   const byFile = new Map();
 

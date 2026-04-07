@@ -1,19 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
-import { walkFiles, readText, relativeTo } from "../utils/fs.js";
+import { walkFiles, relativeTo } from "../utils/fs.js";
 import { sha1 } from "../utils/hash.js";
 import { classifyFileOrigin } from "./generated-filter.js";
 import { detectLanguage, makeId } from "./canonicalize.js";
 
-export function loadRepositoryFiles(rootDir, repoId) {
+export function loadRepositoryFiles(rootDir, repoId): any[] {
   return walkFiles(rootDir).map((filePath) => loadRepositoryFile(rootDir, repoId, filePath));
 }
 
-export function loadRepositoryInventory(rootDir, repoId) {
+export function loadRepositoryInventory(rootDir, repoId): any[] {
   return walkFiles(rootDir).map((filePath) => loadRepositoryInventoryEntry(rootDir, repoId, filePath));
 }
 
-export function loadRepositoryFile(rootDir, repoId, filePath) {
+export function loadRepositoryFile(rootDir, repoId, filePath): any {
   const inventory = loadRepositoryInventoryEntry(rootDir, repoId, filePath);
   const buffer = fs.readFileSync(inventory.absolutePath);
   const isBinary = looksBinary(buffer, inventory.relativePath);
@@ -30,7 +30,7 @@ export function loadRepositoryFile(rootDir, repoId, filePath) {
   };
 }
 
-export function loadRepositoryInventoryEntry(rootDir, repoId, filePath) {
+export function loadRepositoryInventoryEntry(rootDir, repoId, filePath): any {
   const relativePath = relativeTo(rootDir, filePath);
   const language = detectLanguage(relativePath);
   const origin = classifyFileOrigin(relativePath);

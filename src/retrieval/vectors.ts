@@ -1,7 +1,7 @@
 import { MODEL_METADATA } from "../storage/model-metadata.js";
 import { tokenize, cosineSimilarity } from "../utils/text.js";
 
-export function embedText(text, dimension = MODEL_METADATA.embeddings.default.dimension) {
+export function embedText(text, dimension = MODEL_METADATA.embeddings.default.dimension): number[] {
   const vector = new Float32Array(dimension);
   const tokens = tokenize(text);
 
@@ -18,7 +18,7 @@ export function embedText(text, dimension = MODEL_METADATA.embeddings.default.di
   return Array.from(vector, (value) => value / norm);
 }
 
-export function vectorSearch(query, items, limit = 10) {
+export function vectorSearch(query, items, limit = 10): any[] {
   const queryVector = embedText(query);
   return items
     .map((item) => ({

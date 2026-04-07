@@ -1,4 +1,4 @@
-export function recommendPrefetchPages({ recentEvents = [] }) {
+export function recommendPrefetchPages({ recentEvents = [] }): any[] {
   const pages = [];
   for (const event of recentEvents.slice(-8)) {
     if (event.eventType === "edit" && event.payload?.filePath) {

@@ -1,6 +1,6 @@
 import { pageAffinity } from "./affinity.js";
 
-export function maybePinPage(page, reason = "repeat_fault", context = {}) {
+export function maybePinPage(page, reason = "repeat_fault", context = {}): any {
   const affinity = pageAffinity(page, context);
   if (
     (page.faultCount ?? 0) >= 2 ||

@@ -1,6 +1,6 @@
 import { vectorSearch, embedText } from "../vectors.js";
 
-export function collapsedTreeSearch(query, raptorNodes, limit = 10) {
+export function collapsedTreeSearch(query, raptorNodes, limit = 10): any[] {
   const items = raptorNodes.map((node) => ({
     id: node.nodeId,
     label: node.label,

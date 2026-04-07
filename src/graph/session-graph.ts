@@ -1,6 +1,6 @@
 import { makeId } from "../indexing/canonicalize.js";
 
-export function makeSessionEvent({ repoId, sessionId, eventType, payload, confidence = 1 }) {
+export function makeSessionEvent({ repoId, sessionId, eventType, payload, confidence = 1 }): any {
   const createdAt = Date.now();
   return {
     eventId: makeId("session", `${sessionId}:${eventType}:${createdAt}:${JSON.stringify(payload)}`),
@@ -13,7 +13,7 @@ export function makeSessionEvent({ repoId, sessionId, eventType, payload, confid
   };
 }
 
-export function buildSessionEdges(events) {
+export function buildSessionEdges(events): any[] {
   const edges = [];
   for (let i = 0; i < events.length - 1; i += 1) {
     edges.push({

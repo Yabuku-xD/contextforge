@@ -1,6 +1,6 @@
 import { extractQuerySignals } from "../../router/query-signals.js";
 
-export function routeRaptorStrategy(query) {
+export function routeRaptorStrategy(query): { strategy: string; reason: string } {
   const text = String(query ?? "").trim();
   if (!text) {
     return { strategy: "flat", reason: "empty_query" };

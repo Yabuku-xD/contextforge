@@ -1,7 +1,7 @@
 import { makeId } from "../indexing/canonicalize.js";
 import { parseImports, resolveImportTargetFile } from "./import-specifiers.js";
 
-export function extractImportEdges({ repoId, symbols, files }: { repoId: string; symbols: any[]; files: any[] }) {
+export function extractImportEdges({ repoId, symbols, files }: { repoId: string; symbols: any[]; files: any[] }): any[] {
   const symbolByFile = new Map<string, any[]>();
 
   for (const symbol of symbols) {

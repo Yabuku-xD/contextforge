@@ -13,24 +13,24 @@ const DEFAULT_IGNORES = new Set([
   "coverage"
 ]);
 
-export function exists(filePath) {
+export function exists(filePath): boolean {
   return fs.existsSync(filePath);
 }
 
-export function ensureDir(dirPath) {
+export function ensureDir(dirPath): void {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-export function readText(filePath) {
+export function readText(filePath): string {
   return fs.readFileSync(filePath, "utf8");
 }
 
-export function writeText(filePath, content) {
+export function writeText(filePath, content): void {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content, "utf8");
 }
 
-export function walkFiles(rootDir) {
+export function walkFiles(rootDir): string[] {
   const output = [];
 
   function visit(currentDir) {
@@ -53,6 +53,6 @@ export function walkFiles(rootDir) {
   return output;
 }
 
-export function relativeTo(rootDir, filePath) {
+export function relativeTo(rootDir, filePath): string {
   return path.relative(rootDir, filePath) || ".";
 }

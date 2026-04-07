@@ -27,7 +27,7 @@ export function resolveAliasSeeds(query: string, symbols: any[], limit = 5): str
     .map((entry) => entry.symbolId);
 }
 
-export function scoreAliasCandidate(queryShape: { directTokens: Set<string>; expandedTokens: Set<string> }, symbol: any) {
+export function scoreAliasCandidate(queryShape: { directTokens: Set<string>; expandedTokens: Set<string> }, symbol: any): number {
   const { directTokens, expandedTokens } = queryShape;
   const symbolTokens = expandAliasTokens(aliasTokens(`${symbol.displayName} ${symbol.canonicalName}`));
   if (!symbolTokens.size) {

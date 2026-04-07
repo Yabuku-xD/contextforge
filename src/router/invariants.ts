@@ -8,7 +8,7 @@ const ASSERT_RE = /\b(?:AssertionError|AssertionFailedError|Expected:|Received:)
 const KEY_RE = /"[^"]+"\s*:|[A-Za-z0-9_.-]+\s*:/g;
 const IDENT_RE = /\b[A-Za-z_][A-Za-z0-9_]*\b/g;
 
-export function extractInvariants(contentType, content) {
+export function extractInvariants(contentType, content): string[] {
   const text = String(content ?? "");
   const items = [];
 
@@ -35,7 +35,7 @@ export function extractInvariants(contentType, content) {
   return unique(items.filter(Boolean)).slice(0, 64);
 }
 
-export function checkInvariants(invariants, compressedText) {
+export function checkInvariants(invariants, compressedText): { ok: boolean; missing: string[] } {
   const text = String(compressedText ?? "");
   const missing = invariants.filter((item) => !text.includes(item));
   return {

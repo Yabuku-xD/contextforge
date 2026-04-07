@@ -4,7 +4,7 @@ const ASSIGN_RE = /\b([A-Za-z_][A-Za-z0-9_]*)\s*=/g;
 const DECL_RE = /\b(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\b/g;
 const IGNORED = new Set(["if", "for", "while", "return"]);
 
-export function extractDataFlowEdges({ repoId, symbols }) {
+export function extractDataFlowEdges({ repoId, symbols }): any[] {
   const edges = [];
   const producersByName = new Map();
 

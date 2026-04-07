@@ -2,7 +2,7 @@ import { makeId } from "../indexing/canonicalize.js";
 
 const CONTROL_RE = /\bif\s*\((.+?)\)/g;
 
-export function extractControlEdges({ repoId, symbols }) {
+export function extractControlEdges({ repoId, symbols }): any[] {
   const edges = [];
   for (const symbol of symbols) {
     let index = 0;

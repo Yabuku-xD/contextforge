@@ -37,15 +37,15 @@ const REPORT_SPECS = {
   ...CLOSED_TRACK_SPECS
 };
 
-export function loadOpenTrackReport(name) {
+export function loadOpenTrackReport(name): any {
   return loadReportFromBench(name, OPEN_TRACK_SPECS[name]);
 }
 
-export function loadClosedTrackReport(name) {
+export function loadClosedTrackReport(name): any {
   return loadReportFromBench(name, CLOSED_TRACK_SPECS[name]);
 }
 
-export function validateReportFile(filePath) {
+export function validateReportFile(filePath): any {
   const resolved = path.resolve(filePath);
   const name = baselineNameFromPath(resolved);
   const spec = REPORT_SPECS[name];
@@ -58,7 +58,7 @@ export function validateReportFile(filePath) {
   return validateReportObject(parsed, name, spec, resolved);
 }
 
-export function reportInventory() {
+export function reportInventory(): any {
   return {
     openTrack: inventoryFor(OPEN_TRACK_SPECS),
     closedTrack: inventoryFor(CLOSED_TRACK_SPECS)

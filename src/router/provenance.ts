@@ -8,7 +8,7 @@ export function createProvenance({
   spanEnd = null,
   policyClass = "exact",
   compressor = "none"
-}) {
+}): any {
   return {
     provenanceId: sha1(`${sourceType}:${sourceId}:${filePath ?? ""}:${spanStart ?? ""}:${spanEnd ?? ""}`),
     sourceType,

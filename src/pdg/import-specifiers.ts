@@ -3,7 +3,7 @@ import path from "node:path";
 const IMPORT_RE = /^\s*import\s+(.+?)\s+from\s+["'](.+?)["'];?/gm;
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"];
 
-export function parseImports(content) {
+export function parseImports(content): any[] {
   const specs = [];
   for (const match of String(content ?? "").matchAll(IMPORT_RE)) {
     const clause = match[1].trim();
@@ -19,7 +19,7 @@ export function parseImports(content) {
   return specs;
 }
 
-export function resolveImportTargetFile(currentRelativePath, importedPath, files) {
+export function resolveImportTargetFile(currentRelativePath, importedPath, files): any {
   if (!importedPath?.startsWith(".")) {
     return null;
   }

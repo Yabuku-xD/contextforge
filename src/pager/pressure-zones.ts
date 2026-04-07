@@ -1,4 +1,4 @@
-export function pressureZone(totalBudget, usedBudget) {
+export function pressureZone(totalBudget, usedBudget): string {
   const usage = totalBudget ? usedBudget / totalBudget : 0;
   if (usage < 0.6) return "green";
   if (usage < 0.85) return "yellow";

@@ -3,7 +3,7 @@ import { clip, estimateTokens, tokenize, unique } from "../utils/text.js";
 
 const DEFAULT_SECTION_CHARS = 4000;
 
-export function chunkResearchText(text, { maxChars = DEFAULT_SECTION_CHARS } = {}) {
+export function chunkResearchText(text, { maxChars = DEFAULT_SECTION_CHARS } = {}): string[] {
   const normalized = String(text ?? "");
   if (!normalized.length) {
     return [];
@@ -41,7 +41,7 @@ export function storeResearchSource(db, {
   sourceType = "batch",
   metadata = {},
   sections = []
-}) {
+}): any {
   const sourceId = makeId("research", `${repoId}:${sessionId ?? "shared"}:${Date.now()}:${label}`);
   const createdAt = Date.now();
   db.prepare(`
@@ -97,7 +97,7 @@ export function searchResearchSections(db, {
   sessionId = null,
   sourceId = null,
   limit = 3
-}) {
+}): any[] {
   const normalizedQueries = normalizeQueries(queries);
   return normalizedQueries.map((query) => ({
     query,

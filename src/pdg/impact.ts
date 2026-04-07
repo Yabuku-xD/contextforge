@@ -1,6 +1,6 @@
 const IMPACT_EDGE_TYPES = new Set(["call", "control", "data", "import"]);
 
-export function computeImpact(seedSymbolId: string, allEdges: any[], options: Record<string, any> = {}) {
+export function computeImpact(seedSymbolId: string, allEdges: any[], options: Record<string, any> = {}): any[] {
   const maxDepth = options.maxDepth ?? 4;
   const minScore = options.minScore ?? 0.18;
   const relevant = allEdges.filter((edge) => IMPACT_EDGE_TYPES.has(edge.edgeType));

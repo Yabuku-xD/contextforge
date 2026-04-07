@@ -5,7 +5,7 @@ import { loadRepositoryFiles } from "./indexing/files.js";
 import { runOpenTrack } from "./open-track.js";
 import { loadClosedTrackReport } from "./reports.js";
 import { recordSessionEvent } from "./session/events.js";
-import { exists, readText } from "./utils/fs.js";
+import { readText } from "./utils/fs.js";
 import { resolveProjectPath } from "./utils/runtime-paths.js";
 import { estimateTokens, tokenize, unique, clip } from "./utils/text.js";
 
@@ -13,7 +13,7 @@ const BENCH_ROOT = resolveProjectPath(import.meta.url, "benchmark");
 const CLOSED_BASELINES = [];
 const EPSILON = 1e-9;
 
-export async function runPhase3(rootDir) {
+export async function runPhase3(rootDir): Promise<any> {
   await primeIndexedRepo(rootDir);
   const openTrack = await runOpenTrack(rootDir);
   const swebench = await runSweBenchSubset(rootDir);
@@ -29,7 +29,7 @@ export async function runPhase3(rootDir) {
   };
 }
 
-export async function runSweBenchSubset(rootDir) {
+export async function runSweBenchSubset(rootDir): Promise<any> {
   await primeIndexedRepo(rootDir);
   const tasks = loadFixture("swebench/subset.json");
   const baselines = [
@@ -53,7 +53,7 @@ export async function runSweBenchSubset(rootDir) {
   };
 }
 
-export async function runClosedTrack(rootDir) {
+export async function runClosedTrack(rootDir): Promise<any> {
   await primeIndexedRepo(rootDir);
   const localTasks = loadFixture("end-to-end/local-tasks.json");
   const swebenchTasks = loadFixture("swebench/subset.json");

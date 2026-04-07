@@ -1,4 +1,4 @@
-export function purgeOldSessionEvents(db, maxAgeMs = 1000 * 60 * 60 * 24 * 14) {
+export function purgeOldSessionEvents(db, maxAgeMs = 1000 * 60 * 60 * 24 * 14): void {
   const cutoff = Date.now() - maxAgeMs;
   const staleEventIds = db.prepare(`SELECT event_id AS eventId FROM session_events WHERE created_at <= ?`).all(cutoff);
   for (const event of staleEventIds) {
