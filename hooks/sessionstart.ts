@@ -53,6 +53,8 @@ const additionalContext = `
 </contextforge_routing>`.trim();
 
 console.log(JSON.stringify({
+  continue: true,
+  suppressOutput: false,
   hookSpecificOutput: {
     hookEventName: "SessionStart",
     additionalContext

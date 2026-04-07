@@ -16,6 +16,20 @@ function safeExit(code) {
   process.exit(typeof code === "number" ? code : 0);
 }
 
+function emitAllow() {
+  process.stdout.write(
+    JSON.stringify({
+      continue: true,
+      suppressOutput: false,
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        permissionDecisionReason: ""
+      }
+    }) + "\n"
+  );
+}
+
 function resolvePluginRoot() {
   if (process.env.CLAUDE_PLUGIN_ROOT) {
     return path.resolve(process.env.CLAUDE_PLUGIN_ROOT);
@@ -63,6 +77,7 @@ const script = resolveHookScript();
 if (!script) {
   // Hook is not available yet (e.g. plugin freshly installed and runtime
   // cache has not been primed). Stay silent so we never block tool use.
+  emitAllow();
   safeExit(0);
 }
 
@@ -71,7 +86,10 @@ const child = cp.spawn(process.execPath, [script], {
   env: process.env
 });
 
-child.on("error", () => safeExit(0));
+child.on("error", () => {
+  emitAllow();
+  safeExit(0);
+});
 child.on("exit", (code, signal) => {
   if (signal) {
     try {

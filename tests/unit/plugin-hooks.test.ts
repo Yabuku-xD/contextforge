@@ -22,12 +22,62 @@ function writableTempBase() {
   throw new Error("No writable temp directory available for hook tests.");
 }
 
+function installCachedHookStubs(homeDir: string, version = "9.9.9") {
+  const cacheRoot = path.join(
+    homeDir,
+    ".claude",
+    "plugins",
+    "cache",
+    "contextforge",
+    "contextforge",
+    version
+  );
+  const hooksRoot = path.join(cacheRoot, ".claude-plugin", "hooks");
+  fs.mkdirSync(hooksRoot, { recursive: true });
+  fs.copyFileSync(
+    path.resolve(".claude-plugin/hooks/pretooluse.cjs"),
+    path.join(hooksRoot, "pretooluse.cjs")
+  );
+  fs.copyFileSync(
+    path.resolve(".claude-plugin/hooks/sessionstart.cjs"),
+    path.join(hooksRoot, "sessionstart.cjs")
+  );
+  fs.writeFileSync(
+    path.join(cacheRoot, "package.json"),
+    JSON.stringify({ name: "contextforge", version }, null, 2)
+  );
+  return cacheRoot;
+}
+
+function runHookCommand(command: string, {
+  homeDir,
+  cwd,
+  input = ""
+}: {
+  homeDir: string,
+  cwd: string,
+  input?: string
+}) {
+  return execFileSync("/bin/zsh", ["-lc", command], {
+    encoding: "utf8",
+    cwd,
+    input,
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      CLAUDE_PLUGIN_ROOT: ""
+    }
+  });
+}
+
 test("claude plugin hooks register a SessionStart guidance hook", () => {
   const hooks = JSON.parse(fs.readFileSync("hooks/hooks.json", "utf8"));
   const sessionStart = hooks.hooks?.SessionStart?.[0]?.hooks?.[0];
 
   assert.equal(sessionStart?.type, "command");
-  assert.match(sessionStart?.command ?? "", /\.claude-plugin\/hooks\/sessionstart\.cjs$/);
+  assert.match(sessionStart?.command ?? "", /path\.join\(os\.homedir\(\),'\.claude','plugins','cache','contextforge','contextforge'\)/);
+  assert.match(sessionStart?.command ?? "", /sessionstart/);
+  assert.doesNotMatch(sessionStart?.command ?? "", /\$\{CLAUDE_PLUGIN_ROOT\}\/\.claude-plugin\/hooks\/sessionstart\.cjs/);
 });
 
 test("claude plugin hooks register PreToolUse routing guards", () => {
@@ -44,7 +94,9 @@ test("claude plugin hooks register PreToolUse routing guards", () => {
   assert.ok(matchers.includes("Task"));
   for (const entry of preToolUse) {
     assert.equal(entry.hooks?.[0]?.type, "command");
-    assert.match(entry.hooks?.[0]?.command ?? "", /\.claude-plugin\/hooks\/pretooluse\.cjs$/);
+    assert.match(entry.hooks?.[0]?.command ?? "", /path\.join\(os\.homedir\(\),'\.claude','plugins','cache','contextforge','contextforge'\)/);
+    assert.match(entry.hooks?.[0]?.command ?? "", /pretooluse/);
+    assert.doesNotMatch(entry.hooks?.[0]?.command ?? "", /\$\{CLAUDE_PLUGIN_ROOT\}\/\.claude-plugin\/hooks\/pretooluse\.cjs/);
   }
 });
 
@@ -52,6 +104,8 @@ test("sessionstart hook emits ContextForge routing guidance", () => {
   const output = execFileSync(process.execPath, ["dist/hooks/sessionstart.js"], { encoding: "utf8" });
   const payload = JSON.parse(output);
 
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "SessionStart");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_start/);
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_batch/);
@@ -94,6 +148,8 @@ test("pretooluse denies broad repo subagent fanout", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, false);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /ContextForge/i);
@@ -115,6 +171,8 @@ test("pretooluse nudges broad repo discovery back toward ContextForge", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /ContextForge/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /permission-denied/i);
@@ -136,6 +194,8 @@ test("pretooluse routes output-heavy bash toward forge_batch", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_batch/i);
   assert.match(payload.hookSpecificOutput.additionalContext, /permission-denied/i);
@@ -179,6 +239,8 @@ test("pretooluse denies built-in read after a recent exhaustive walk in the same
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, false);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.equal(payload.hookSpecificOutput.permissionDecision, "deny");
   assert.match(payload.hookSpecificOutput.permissionDecisionReason, /exhaustive repository walk/i);
@@ -199,6 +261,8 @@ test("pretooluse nudges plain Read toward forge_read by default", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_read/);
   assert.match(payload.hookSpecificOutput.additionalContext, /default path/i);
@@ -218,6 +282,8 @@ test("pretooluse nudges plain Write toward forge_write by default", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_write/);
 });
@@ -236,6 +302,8 @@ test("pretooluse nudges plain Edit toward forge_edit by default", () => {
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.match(payload.hookSpecificOutput.additionalContext, /forge_edit/);
 });
@@ -282,6 +350,53 @@ test("pretooluse does not create a repository database just to inspect recent wa
   );
 
   const payload = JSON.parse(output);
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
   assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
   assert.equal(fs.existsSync(path.join(tempDir, ".contextforge", "contextforge.db")), false);
+});
+
+test("sessionstart hook command resolves from cached plugin stubs without CLAUDE_PLUGIN_ROOT", () => {
+  const hooks = JSON.parse(fs.readFileSync("hooks/hooks.json", "utf8"));
+  const command = hooks.hooks?.SessionStart?.[0]?.hooks?.[0]?.command;
+  assert.ok(command);
+
+  const fakeHome = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-home-"));
+  const targetRepo = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-target-"));
+  installCachedHookStubs(fakeHome);
+
+  const output = runHookCommand(command, {
+    homeDir: fakeHome,
+    cwd: targetRepo
+  });
+  const payload = JSON.parse(output);
+
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "SessionStart");
+});
+
+test("pretooluse hook command resolves from cached plugin stubs without CLAUDE_PLUGIN_ROOT", () => {
+  const hooks = JSON.parse(fs.readFileSync("hooks/hooks.json", "utf8"));
+  const command = hooks.hooks?.PreToolUse?.find((entry) => entry.matcher === "Bash")?.hooks?.[0]?.command;
+  assert.ok(command);
+
+  const fakeHome = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-home-"));
+  const targetRepo = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-target-"));
+  installCachedHookStubs(fakeHome);
+
+  const output = runHookCommand(command, {
+    homeDir: fakeHome,
+    cwd: targetRepo,
+    input: JSON.stringify({
+      tool_name: "Bash",
+      tool_input: { command: "echo hello" }
+    })
+  });
+  const payload = JSON.parse(output);
+
+  assert.equal(payload.continue, true);
+  assert.equal(payload.suppressOutput, false);
+  assert.equal(payload.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(payload.hookSpecificOutput.permissionDecision, "allow");
 });

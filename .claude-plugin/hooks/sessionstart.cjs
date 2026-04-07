@@ -62,6 +62,8 @@ if (!script) {
   // Code does not log a hook error and the session can proceed.
   process.stdout.write(
     JSON.stringify({
+      continue: true,
+      suppressOutput: false,
       hookSpecificOutput: {
         hookEventName: "SessionStart",
         additionalContext: ""
@@ -76,7 +78,19 @@ const child = cp.spawn(process.execPath, [script], {
   env: process.env
 });
 
-child.on("error", () => safeExit(0));
+child.on("error", () => {
+  process.stdout.write(
+    JSON.stringify({
+      continue: true,
+      suppressOutput: false,
+      hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext: ""
+      }
+    }) + "\n"
+  );
+  safeExit(0);
+});
 child.on("exit", (code, signal) => {
   if (signal) {
     try {

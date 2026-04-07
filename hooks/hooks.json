@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       },
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/pretooluse.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{if(session)process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}})+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" pretooluse"
           }
         ]
       }
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/sessionstart.cjs"
+            "command": "node -e \"const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');const hook=process.argv[1],session=hook==='sessionstart';const fallback=()=>{const payload=session?{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:''}}:{continue:true,suppressOutput:false,hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow',permissionDecisionReason:''}};process.stdout.write(JSON.stringify(payload)+'\\n');process.exit(0);};const roots=[];if(process.env.CLAUDE_PLUGIN_ROOT)roots.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));const push=(base,tail=[])=>{try{for(const entry of fs.readdirSync(base).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true,sensitivity:'base'})))roots.push(path.join(base,entry,...tail));}catch{}};push(path.join(os.homedir(),'.claude','plugins','cache','contextforge','contextforge'));push(path.join(os.homedir(),'.contextforge','runtime'),['node_modules','contextforge']);const root=roots.find((candidate)=>fs.existsSync(path.join(candidate,'.claude-plugin','hooks',hook+'.cjs')));if(!root)fallback();const child=cp.spawn(process.execPath,[path.join(root,'.claude-plugin','hooks',hook+'.cjs')],{stdio:'inherit',env:process.env});child.on('error',fallback);child.on('exit',(code,signal)=>{if(signal){try{process.kill(process.pid,signal);return;}catch{fallback();}}process.exit(code??0);});\" sessionstart"
           }
         ]
       }

@@ -48,6 +48,8 @@ function isOutputHeavyCommand(command) {
 
 function formatContext(additionalContext) {
   return {
+    continue: true,
+    suppressOutput: false,
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       additionalContext
@@ -57,6 +59,8 @@ function formatContext(additionalContext) {
 
 function formatDeny(reason) {
   return {
+    continue: false,
+    suppressOutput: false,
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
