@@ -13,6 +13,30 @@ export function registerContextForgeResources(server: any, forge: any): void {
     }]
   }));
 
+  server.registerResource("contextforge-memory-status", "contextforge://memory/status", {
+    title: "ContextForge Memory Status",
+    description: "Global long-term memory status, layer counts, and wake-up preview.",
+    mimeType: "application/json"
+  }, async () => ({
+    contents: [{
+      uri: "contextforge://memory/status",
+      mimeType: "application/json",
+      text: JSON.stringify(forge.memoryStatus(), null, 2)
+    }]
+  }));
+
+  server.registerResource("contextforge-memory-wakeup", "contextforge://memory/wakeup", {
+    title: "ContextForge Memory Wakeup",
+    description: "Compact wake-up memory capsule for the current repository/session.",
+    mimeType: "application/json"
+  }, async () => ({
+    contents: [{
+      uri: "contextforge://memory/wakeup",
+      mimeType: "application/json",
+      text: JSON.stringify(forge.memoryWakeup(), null, 2)
+    }]
+  }));
+
   const repoResources: any[] = [
     ["contextforge-overview", "contextforge://repo/overview", "ContextForge Repo Overview", "Top-level repository overview and index status.", () => forge.scan("repo overview")],
     ["contextforge-areas", "contextforge://repo/areas", "ContextForge Areas", "Derived package and directory areas from the repository graph.", () => forge.areas()],

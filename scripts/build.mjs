@@ -20,6 +20,7 @@ if (tsc.status !== 0) {
 }
 
 copyFile("src/storage/schema.sql");
+copyFile("src/memory/schema.sql");
 
 function copyFile(relativePath) {
   const sourcePath = path.join(repoRoot, relativePath);

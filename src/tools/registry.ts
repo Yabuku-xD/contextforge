@@ -1,5 +1,18 @@
 import { forgeGetTool } from "./forge_get_tool.js";
 import { forgeStartupTool } from "./forge_startup.js";
+import { forgeMemoryStatusTool } from "./forge_memory_status.js";
+import { forgeMemoryWakeupTool } from "./forge_memory_wakeup.js";
+import { forgeMemoryRecallTool } from "./forge_memory_recall.js";
+import { forgeMemorySearchTool } from "./forge_memory_search.js";
+import { forgeMemorySaveTool } from "./forge_memory_save.js";
+import { forgeMemoryProfileSetTool } from "./forge_memory_profile_set.js";
+import { forgeMemoryProfileGetTool } from "./forge_memory_profile_get.js";
+import { forgeMemoryDiaryWriteTool } from "./forge_memory_diary_write.js";
+import { forgeMemoryDiaryReadTool } from "./forge_memory_diary_read.js";
+import { forgeMemoryFactAddTool } from "./forge_memory_fact_add.js";
+import { forgeMemoryFactInvalidateTool } from "./forge_memory_fact_invalidate.js";
+import { forgeMemoryFactQueryTool } from "./forge_memory_fact_query.js";
+import { forgeMemoryTimelineTool } from "./forge_memory_timeline.js";
 import { forgeBatchTool } from "./forge_batch.js";
 import { forgeLookupTool } from "./forge_lookup.js";
 import { forgeScanTool } from "./forge_scan.js";
@@ -30,6 +43,19 @@ import { forgeDoctorTool } from "./forge_doctor.js";
 export const TOOL_REGISTRY = {
   forge_get_tool: forgeGetTool,
   forge_startup: forgeStartupTool,
+  forge_memory_status: forgeMemoryStatusTool,
+  forge_memory_wakeup: forgeMemoryWakeupTool,
+  forge_memory_recall: forgeMemoryRecallTool,
+  forge_memory_search: forgeMemorySearchTool,
+  forge_memory_save: forgeMemorySaveTool,
+  forge_memory_profile_set: forgeMemoryProfileSetTool,
+  forge_memory_profile_get: forgeMemoryProfileGetTool,
+  forge_memory_diary_write: forgeMemoryDiaryWriteTool,
+  forge_memory_diary_read: forgeMemoryDiaryReadTool,
+  forge_memory_fact_add: forgeMemoryFactAddTool,
+  forge_memory_fact_invalidate: forgeMemoryFactInvalidateTool,
+  forge_memory_fact_query: forgeMemoryFactQueryTool,
+  forge_memory_timeline: forgeMemoryTimelineTool,
   forge_batch: forgeBatchTool,
   forge_lookup: forgeLookupTool,
   forge_scan: forgeScanTool,

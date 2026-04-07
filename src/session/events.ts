@@ -1,16 +1,11 @@
 import { makeSessionEvent, buildSessionEdges } from "../graph/session-graph.js";
-import { redactSecrets } from "./redaction.js";
+import { redactSecretsDeep } from "./redaction.js";
 
 export function recordSessionEvent(
   db: any,
   { repoId, sessionId, eventType, payload, confidence = 1 }: Record<string, any>
 ) {
-  const safePayload = JSON.parse(JSON.stringify(payload ?? {}));
-  for (const key of Object.keys(safePayload)) {
-    if (typeof safePayload[key] === "string") {
-      safePayload[key] = redactSecrets(safePayload[key]);
-    }
-  }
+  const safePayload = redactSecretsDeep(JSON.parse(JSON.stringify(payload ?? {})));
 
   const event = makeSessionEvent({ repoId, sessionId, eventType, payload: safePayload, confidence });
   try {

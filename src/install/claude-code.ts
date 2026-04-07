@@ -18,7 +18,12 @@ const MUTATING_TOOL_NAMES = new Set([
   "forge_rename",
   "forge_map",
   "forge_contracts",
-  "forge_wiki"
+  "forge_wiki",
+  "forge_memory_save",
+  "forge_memory_profile_set",
+  "forge_memory_diary_write",
+  "forge_memory_fact_add",
+  "forge_memory_fact_invalidate"
 ]);
 
 type ClaudeInstallOptions = {

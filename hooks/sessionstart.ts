@@ -10,6 +10,7 @@ const additionalContext = `
   - blast radius or change impact
   - why a symbol, file, or behavior matters
   - resuming prior work in the same repository
+  - durable memory, prior decisions, project history, or remembered facts
 
   Tool preference:
   - forge_start: warm up ContextForge for non-trivial repo tasks and establish paging/session state. On large repositories it may queue the eager full-repository prime in the background so it can return quickly
@@ -32,6 +33,14 @@ const additionalContext = `
   - forge_map, forge_contracts, forge_wiki: generate architecture or documentation artifacts from the index
   - forge_list_repos, forge_group_query, forge_group_status: multi-repo registry and group workflows
   - forge_resume or forge_session: session continuity
+  - forge_memory_status: show the long-term memory stack, counts, and layer availability
+  - forge_memory_wakeup: load the compact wake-up capsule before assuming prior decisions, identity, or project history
+  - forge_memory_recall: scoped topic recall for the current repo, hall, or room
+  - forge_memory_search: deep-search memory entries, diaries, and remembered facts
+  - forge_memory_save: save durable discoveries, decisions, and preferences
+  - forge_memory_profile_set / forge_memory_profile_get: set or inspect identity/project memory profiles
+  - forge_memory_diary_write / forge_memory_diary_read: write or read diary/checkpoint notes
+  - forge_memory_fact_add / forge_memory_fact_invalidate / forge_memory_fact_query / forge_memory_timeline: manage temporal facts and timelines
   - forge_stats or forge_doctor: health and diagnostics
 
   Prompt routing examples:
@@ -46,8 +55,12 @@ const additionalContext = `
   - "search the saved logs from earlier", "find the error in that stored output": forge_lookup
   - "make me a repo map", "generate the repo wiki", "show integration contracts": forge_map, forge_wiki, forge_contracts
   - "what repos are registered", "search across grouped repos": forge_list_repos, forge_group_query, forge_group_status
+  - "what should you remember before we continue", "load prior decisions", "wake up memory": forge_memory_wakeup
+  - "remember this", "save this decision", "store this long-term": forge_memory_save
+  - "what do you remember about X", "search remembered notes", "verify this remembered fact": forge_memory_search or forge_memory_fact_query
+  - "timeline of X", "what changed over time": forge_memory_timeline
 
-  At session start, treat forge_start as the prime step: it should prepare ContextForge immediately and may queue the full eager index in the background on large repositories so the first MCP call does not time out. A queued startup prime is normal, not a failure. For initial repo-overview questions, answer from forge_scan, forge_understand, or forge_walk first. Keep the first whole-repo answer compact: coverage verdict, top-level architecture, major areas, key entrypoints, and a short next-step suggestion. Avoid long tables unless the user explicitly asks for them. If the task is shell-heavy, log-heavy, or likely to return large command output, prefer forge_batch first and use forge_lookup for follow-up questions. If the user asks for every file or the whole repo exhaustively, treat forge_walk's audit as the authoritative first pass, answer from it before spawning Explore agents, and if the user asks "did you read every file?", "did you read the whole project?", or "did you read every corner of the files?" answer yes when forge_walk reports exhaustive coverage. Only then add the nuance that the chat answer is compact and not every line is retained verbatim in active message memory. After a successful exhaustive forge_walk, stop tool use for the initial answer. Do not call forge_read, forge_batch, forge_lookup, forge_search, built-in Read, built-in Bash, or built-in Grep for the first response. The audit is already complete enough. Only drill down afterward if the user explicitly asks for deeper detail or ContextForge reports incomplete coverage. For targeted file reads, exact edits, file writes, or shell commands that stay inside the repo, prefer forge_read, forge_edit, forge_write, or forge_bash before reaching for heavier built-in tool paths. Staying on the ContextForge path reduces extra permission prompts because these repo-native tools are intended to be pre-approved at install time. Do not immediately fall back to manually reading many files or spawning Explore agents unless the user explicitly asks for a deeper drilldown or the ContextForge result is insufficient.
+  At session start, treat forge_start as the prime step: it should prepare ContextForge immediately and may queue the full eager index in the background on large repositories so the first MCP call does not time out. A queued startup prime is normal, not a failure. For initial repo-overview questions, answer from forge_scan, forge_understand, or forge_walk first. Before guessing about prior decisions, long-term preferences, or remembered project history, load forge_memory_wakeup or forge_memory_status. Keep the first whole-repo answer compact: coverage verdict, top-level architecture, major areas, key entrypoints, and a short next-step suggestion. Avoid long tables unless the user explicitly asks for them. If the task is shell-heavy, log-heavy, or likely to return large command output, prefer forge_batch first and use forge_lookup for follow-up questions. If the user asks for every file or the whole repo exhaustively, treat forge_walk's audit as the authoritative first pass, answer from it before spawning Explore agents, and if the user asks "did you read every file?", "did you read the whole project?", or "did you read every corner of the files?" answer yes when forge_walk reports exhaustive coverage. Only then add the nuance that the chat answer is compact and not every line is retained verbatim in active message memory. After a successful exhaustive forge_walk, stop tool use for the initial answer. Do not call forge_read, forge_batch, forge_lookup, forge_search, built-in Read, built-in Bash, or built-in Grep for the first response. The audit is already complete enough. Only drill down afterward if the user explicitly asks for deeper detail or ContextForge reports incomplete coverage. For targeted file reads, exact edits, file writes, or shell commands that stay inside the repo, prefer forge_read, forge_edit, forge_write, or forge_bash before reaching for heavier built-in tool paths. Staying on the ContextForge path reduces extra permission prompts because these repo-native tools are intended to be pre-approved at install time. Do not immediately fall back to manually reading many files or spawning Explore agents unless the user explicitly asks for a deeper drilldown or the ContextForge result is insufficient.
 
   Do not switch to another MCP for repo structure, architecture, impact, or session-memory work unless ContextForge is unavailable or insufficient for the task.
 </contextforge_routing>`.trim();

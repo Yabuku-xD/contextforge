@@ -44,8 +44,22 @@ function writableTempBase(excludeRoot?: string) {
   throw new Error("No writable temp directory available for tests.");
 }
 
+function memoryRootFor(rootDir: string) {
+  const slug = path.resolve(rootDir).replace(/[^a-z0-9]+/gi, "_").slice(-80);
+  const base = path.join(writableTempBase(rootDir), "contextforge-memory-tests");
+  fs.mkdirSync(base, { recursive: true });
+  return path.join(base, slug);
+}
+
+function createTestForge(rootDir: string, options: Record<string, any> = {}) {
+  return createContextForge(rootDir, {
+    ...options,
+    memoryRoot: options.memoryRoot ?? memoryRootFor(rootDir)
+  });
+}
+
 test("Phase 1 can index, search, analyze impact, and resume", async () => {
-  const forge = createContextForge(sampleRepo, { sessionId: `test_session_${Date.now()}` });
+  const forge = createTestForge(sampleRepo, { sessionId: `test_session_${Date.now()}` });
   try {
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.filesIndexed >= 3);
@@ -82,6 +96,103 @@ test("Phase 1 can index, search, analyze impact, and resume", async () => {
   }
 });
 
+test("ContextForge global memory persists wakeup entries, facts, diaries, and autosave checkpoints", () => {
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-memory-"));
+  fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "memory-fixture", version: "1.0.0" }, null, 2));
+  fs.writeFileSync(path.join(tempRoot, "src", "index.ts"), "export const memory = true;\n");
+  const memoryRoot = memoryRootFor(tempRoot);
+
+  const forge = createTestForge(tempRoot, {
+    sessionId: `memory_${Date.now()}`,
+    memoryRoot
+  });
+  try {
+    forge.memoryProfileSet({
+      profileType: "identity",
+      name: "ContextForge",
+      summary: "Claude-first coding memory with layered wake-up recall."
+    });
+    forge.memoryProfileSet({
+      profileType: "project:memory-fixture",
+      name: "memory-fixture",
+      summary: "Temporary project used to validate durable memory behavior."
+    });
+
+    const saved = forge.memorySave({
+      title: "SQLite memory decision",
+      summary: "Use SQLite-backed global memory for durable recall with password='secret123'.",
+      detail: "The durable memory layer stores entries, diaries, and temporal facts in one global DB with sk-abcdefghijklmnopqrstuvwxyz hidden.",
+      hall: "discoveries",
+      tags: ["sqlite", "memory"],
+      entities: ["ContextForge", "SQLite"]
+    });
+    assert.equal(saved.saved, true);
+    assert.equal(saved.entry.title, "SQLite memory decision");
+    assert.doesNotMatch(saved.entry.summary, /secret123|sk-abcdefghijklmnopqrstuvwxyz/);
+    assert.match(saved.entry.summary, /\[REDACTED\]/);
+
+    const fact = forge.memoryFactAdd({
+      subject: "ContextForge",
+      predicate: "uses",
+      object: "SQLite"
+    });
+    assert.equal(fact.object, "SQLite");
+
+    const diary = forge.memoryDiaryWrite({
+      title: "Memory checkpoint",
+      entryText: "Implemented durable wake-up memory with facts and diary support using password='secret123'.",
+      tags: ["memory", "checkpoint"]
+    });
+    assert.equal(diary.title, "Memory checkpoint");
+    assert.doesNotMatch(diary.entryText, /secret123/);
+
+    for (let index = 0; index < 8; index += 1) {
+      forge._recordSessionEvent({
+        eventType: "decision",
+        payload: {
+          filePath: `src/memory-${index}.ts`,
+          query: `memory autosave ${index}`
+        }
+      });
+    }
+
+    const wakeup = forge.memoryWakeup();
+    assert.match(wakeup.text, /L0 — IDENTITY/);
+    assert.match(wakeup.text, /SQLite memory decision|ContextForge uses SQLite/);
+
+    const search = forge.memorySearch("SQLite");
+    assert.ok(search.results.some((result: any) => result.preview?.includes("SQLite") || result.object === "SQLite"));
+
+    const facts = forge.memoryFactQuery("ContextForge");
+    assert.ok(facts.facts.some((entry: any) => entry.object === "SQLite"));
+
+    const timeline = forge.memoryTimeline("ContextForge");
+    assert.ok(timeline.events.some((entry: any) => entry.object === "SQLite"));
+
+    const stats = forge.memoryStatus();
+    assert.ok(stats.counts.entries >= 1);
+    assert.ok(stats.counts.diaries >= 1);
+    assert.ok(stats.counts.activeFacts >= 1);
+    assert.ok(stats.counts.checkpoints >= 1);
+  } finally {
+    forge.close();
+  }
+
+  const resumed = createTestForge(tempRoot, {
+    sessionId: `memory_resume_${Date.now()}`,
+    memoryRoot
+  });
+  try {
+    const search = resumed.memorySearch("durable recall");
+    assert.ok(search.results.some((result: any) => result.kind === "entry"));
+    assert.match(resumed.memoryWakeup().text, /Memory checkpoint|SQLite memory decision|ContextForge uses SQLite/);
+  } finally {
+    resumed.close();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("ContextForge can index and understand the repository hosting itself", async () => {
   const tempRoot = fs.mkdtempSync(path.join(writableTempBase(repoRoot), "contextforge-self-hosted-"));
   fs.cpSync(repoRoot, tempRoot, {
@@ -103,7 +214,7 @@ test("ContextForge can index and understand the repository hosting itself", asyn
     }
   });
 
-  const forge = createContextForge(tempRoot, { sessionId: `self_hosted_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `self_hosted_${Date.now()}` });
   try {
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.filesIndexed > 0);
@@ -150,7 +261,7 @@ test("ContextForge native file ops handle read write edit directory and bash flo
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "fileops-fixture", version: "1.0.0" }, null, 2));
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export function run() {\n  return 'hello';\n}\n");
 
-  const forge = createContextForge(tempRoot, { sessionId: `file_ops_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `file_ops_${Date.now()}` });
   try {
     const startup = forge.startup("prime the repository");
     assert.ok(startup.index.filesIndexed >= 2);
@@ -229,7 +340,7 @@ test("ContextForge native file ops handle read write edit directory and bash flo
 });
 
 test("ContextForge exposes graph areas, flows, schema, and generated artifacts", () => {
-  const forge = createContextForge(sampleRepo, { sessionId: `graph_surface_${Date.now()}` });
+  const forge = createTestForge(sampleRepo, { sessionId: `graph_surface_${Date.now()}` });
   try {
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.contentCoverage.complete);
@@ -267,7 +378,7 @@ test("forge_lookup handles code-ish queries and stays scoped to the current sess
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "research-fixture", version: "1.0.0" }, null, 2));
 
   const sourceSessionId = `research_source_${Date.now()}`;
-  const sourceForge = createContextForge(tempRoot, { sessionId: sourceSessionId });
+  const sourceForge = createTestForge(tempRoot, { sessionId: sourceSessionId });
   let sourceId = null;
 
   try {
@@ -292,7 +403,7 @@ test("forge_lookup handles code-ish queries and stays scoped to the current sess
     sourceForge.close();
   }
 
-  const isolatedForge = createContextForge(tempRoot, { sessionId: `research_other_${Date.now()}` });
+  const isolatedForge = createTestForge(tempRoot, { sessionId: `research_other_${Date.now()}` });
   try {
     const defaultLookup = isolatedForge.lookup(["alpha-secret"]);
     assert.equal(defaultLookup.queries[0].matches.length, 0);
@@ -326,7 +437,7 @@ test("ContextForge can map git changes and apply coordinated renames", () => {
     assert.equal(result.status, 0, result.stderr);
   }
 
-  const forge = createContextForge(tempRoot, { sessionId: `git_changes_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `git_changes_${Date.now()}` });
   try {
     const indexSummary = forge.indexRepository();
     assert.ok(indexSummary.contentCoverage.complete);
@@ -359,7 +470,7 @@ test("forge_rename avoids touching unrelated same-name symbols in other files", 
   fs.writeFileSync(path.join(tempRoot, "src", "a.js"), "export function run() { return 1; }\nexport function keep() { return run(); }\n");
   fs.writeFileSync(path.join(tempRoot, "src", "b.js"), "export function run() { return 2; }\nexport function other() { return run(); }\n");
 
-  const forge = createContextForge(tempRoot, { sessionId: `rename_scope_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `rename_scope_${Date.now()}` });
   try {
     forge.indexRepository();
 
@@ -380,7 +491,7 @@ test("ContextForge file ops do not follow symlinks outside the repository", () =
   fs.writeFileSync(path.join(outsideRoot, "secret.txt"), "top-secret\n");
   fs.symlinkSync(outsideRoot, path.join(tempRoot, "link-out"));
 
-  const forge = createContextForge(tempRoot, { sessionId: `symlink_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `symlink_${Date.now()}` });
   try {
     assert.throws(() => forge.read("link-out/secret.txt"), /resolving symlinks/i);
     assert.throws(() => forge.write("link-out/secret.txt", "after"), /resolving symlinks/i);
@@ -400,7 +511,7 @@ test("forge_start can defer the eager prime on larger repositories", () => {
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "deferred-fixture", version: "1.0.0" }, null, 2));
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
   fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
-  const forge = createContextForge(tempRoot, { sessionId: `deferred_startup_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `deferred_startup_${Date.now()}` });
 
   try {
     const startup = forge.startup("exhaustive full repository walk - every file, folder, subfolder");
@@ -431,8 +542,8 @@ test("ContextForge registry, groups, and bridge server work across multiple repo
   fs.writeFileSync(path.join(repoA, "src", "alpha.js"), "export function alphaCheckout() {\n  return 'checkout';\n}\n");
   fs.writeFileSync(path.join(repoB, "src", "beta.js"), "export function betaCheckout() {\n  return 'checkout beta';\n}\n");
 
-  const forgeA = createContextForge(repoA, { sessionId: `group_a_${Date.now()}` });
-  const forgeB = createContextForge(repoB, { sessionId: `group_b_${Date.now()}` });
+  const forgeA = createTestForge(repoA, { sessionId: `group_a_${Date.now()}` });
+  const forgeB = createTestForge(repoB, { sessionId: `group_b_${Date.now()}` });
   const groupName = `integration-group-${Date.now()}`;
 
   let bridge = null;
@@ -488,7 +599,7 @@ test("forge_start stays usable when the repository database is write-locked", ()
   fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "startup-lock-fixture", version: "1.0.0" }, null, 2));
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
 
-  const forge = createContextForge(tempRoot, { sessionId: `startup_lock_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `startup_lock_${Date.now()}` });
   const lockDbPath = path.join(tempRoot, ".contextforge", "contextforge.db");
   const lockDb = new DatabaseSync(lockDbPath);
 
@@ -528,7 +639,7 @@ test("indexRepository can batch file ingestion into one persistent index", () =>
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
   fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
 
-  const forge = createContextForge(tempRoot, { sessionId: `batched_index_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `batched_index_${Date.now()}` });
   try {
     const summary = forge.indexRepository();
     assert.equal(summary.batchSize, 1);
@@ -563,7 +674,7 @@ test("forge_walk stays usable immediately after deferred startup", () => {
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export const app = true;\n");
   fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export const worker = true;\n");
   fs.writeFileSync(path.join(tempRoot, "README.md"), "# Deferred walk fixture\n");
-  const forge = createContextForge(tempRoot, { sessionId: `deferred_walk_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `deferred_walk_${Date.now()}` });
 
   try {
     const startup = forge.startup("exhaustive full repository walk - every file, folder, subfolder");
@@ -589,7 +700,7 @@ test("ensureRepositoryIndexed repairs repositories left in deriving after file i
   fs.writeFileSync(path.join(tempRoot, "src", "app.js"), "export function runApp() {\n  return 'app';\n}\n");
   fs.writeFileSync(path.join(tempRoot, "src", "worker.js"), "export function runWorker() {\n  return runApp();\n}\n");
 
-  const forge = createContextForge(tempRoot, { sessionId: `derive_repair_${Date.now()}` });
+  const forge = createTestForge(tempRoot, { sessionId: `derive_repair_${Date.now()}` });
   try {
     const indexed = forge.indexRepository();
     assert.equal(indexed.indexStatus, "ready");

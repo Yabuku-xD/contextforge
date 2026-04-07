@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
+const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-mcp-memory-"));
 
 function textContent(resource: { contents: Array<{ text?: string; blob?: string }> }) {
   const [first] = resource.contents ?? [];
@@ -19,6 +21,10 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     command: process.execPath,
     args: [path.resolve("dist/.claude-plugin/bootstrap-mcp.js"), "--root", sampleRepo],
     cwd: path.resolve("."),
+    env: {
+      ...process.env,
+      CONTEXTFORGE_MEMORY_ROOT: memoryRoot
+    },
     stderr: "pipe"
   });
 
@@ -27,6 +33,9 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
   try {
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "forge_start"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_status"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_wakeup"));
+    assert.ok(tools.tools.some((tool) => tool.name === "forge_memory_search"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_batch"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_lookup"));
     assert.ok(tools.tools.some((tool) => tool.name === "forge_scan"));
@@ -50,16 +59,25 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     assert.match(toolDescriptions.forge_lookup, /search the logs from earlier|saved test output/i);
     assert.match(toolDescriptions.forge_symbol, /where is function X defined|find symbol named/i);
     assert.match(toolDescriptions.forge_scope, /how is this project structured|which modules talk to each other/i);
+    assert.match(toolDescriptions.forge_memory_wakeup, /wake-up memory|prior decisions|project history/i);
+    assert.match(toolDescriptions.forge_memory_save, /remember this|save this decision|long-term/i);
 
     const resources = await client.listResources();
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/overview"));
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/flows"));
     assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://repo/schema"));
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://memory/status"));
+    assert.ok(resources.resources.some((resource) => resource.uri === "contextforge://memory/wakeup"));
 
     const overviewResource = await client.readResource({
       uri: "contextforge://repo/overview"
     });
     assert.match(textContent(overviewResource), /importantFiles|topLevel/i);
+
+    const memoryStatusResource = await client.readResource({
+      uri: "contextforge://memory/status"
+    });
+    assert.match(textContent(memoryStatusResource), /globalMemory|L0_identity/i);
 
     const generatedMapPath = path.join(sampleRepo, ".contextforge", "generated", "map.md");
     const generatedContractsPath = path.join(sampleRepo, ".contextforge", "generated", "contracts.md");
@@ -93,6 +111,33 @@ test("mcp server exposes ContextForge tools over stdio", async () => {
     });
     assert.ok(!startup.isError);
     assert.match(startup.content[0].text, /filesIndexed/);
+    assert.match(startup.content[0].text, /recommendedNextTool/);
+
+    const memorySave = await client.callTool({
+      name: "forge_memory_save",
+      arguments: {
+        title: "Test memory",
+        summary: "Remember that ContextForge now has a durable memory layer."
+      }
+    });
+    assert.ok(!memorySave.isError);
+    assert.match(memorySave.content[0].text, /saved|entry/);
+
+    const memoryWakeup = await client.callTool({
+      name: "forge_memory_wakeup",
+      arguments: {}
+    });
+    assert.ok(!memoryWakeup.isError);
+    assert.match(memoryWakeup.content[0].text, /L0|L1/);
+
+    const memorySearch = await client.callTool({
+      name: "forge_memory_search",
+      arguments: {
+        query: "durable memory layer"
+      }
+    });
+    assert.ok(!memorySearch.isError);
+    assert.match(memorySearch.content[0].text, /Found .* memory hit|results/);
 
     const search = await client.callTool({
       name: "forge_search",
@@ -228,6 +273,7 @@ test("bootstrap launcher resolves the local dev server when dependencies are ava
     cwd: path.resolve("."),
     env: {
       ...process.env,
+      CONTEXTFORGE_MEMORY_ROOT: memoryRoot,
       CONTEXTFORGE_BOOTSTRAP_MODE: "inspect"
     },
     encoding: "utf8"

@@ -212,7 +212,10 @@ test("pretooluse denies built-in read after a recent exhaustive walk in the same
   fs.mkdirSync(path.join(tempDir, "src"), { recursive: true });
   fs.writeFileSync(path.join(tempDir, "src", "index.ts"), "export const value = 1;\n");
 
-  const forge = createContextForge(tempDir, { sessionId: "hook-session" });
+  const forge = createContextForge(tempDir, {
+    sessionId: "hook-session",
+    memoryRoot: path.join(writableTempBase(), "contextforge-memory-tests", "plugin-hooks")
+  });
   try {
     forge.walk("go through every single file folder and subfolder in this repository");
     rememberActiveSession(tempDir, forge.sessionId, {

@@ -54,6 +54,25 @@ import {
   removeRepoFromGroup,
   resolveRegisteredRepository
 } from "./storage/registry.js";
+import { defaultMemoryRoot, openMemoryDatabase } from "./memory/db.js";
+import { buildDiaryFromCheckpoint, buildSessionCheckpointCandidate } from "./memory/extract.js";
+import { buildMemoryRecall, buildMemoryStatus, buildMemoryWakeup } from "./memory/layers.js";
+import {
+  addMemoryFact,
+  ensureMemoryProfile,
+  getLatestMemoryCheckpoint,
+  getMemoryProfile,
+  getMemoryStats,
+  invalidateMemoryFact,
+  listMemoryProfiles,
+  memoryTimeline as loadMemoryTimeline,
+  queryMemoryFacts,
+  readDiaryEntries,
+  recordMemoryCheckpoint,
+  searchMemory,
+  storeDiaryEntry,
+  storeMemoryEntry
+} from "./memory/store.js";
 
 const REPO_STATE_CACHE = new Map();
 const SYSTEM_EVENT_TYPES = new Set(["index", "index_reuse", "startup", "search"]);
@@ -111,6 +130,8 @@ type RegisteredRepoSummary = {
 export interface ContextForge {
   rootDir: string;
   db: any;
+  memoryDb: any;
+  memoryRoot: string;
   repoId: string;
   sessionId: string;
   coreInstructions: string;
@@ -135,6 +156,10 @@ export class ContextForge {
   constructor(rootDir: string, options: Record<string, any> = {}) {
     this.rootDir = path.resolve(rootDir);
     this.db = openDatabase(this.rootDir);
+    this.memoryRoot = path.resolve(options.memoryRoot ?? process.env.CONTEXTFORGE_MEMORY_ROOT ?? defaultMemoryRoot());
+    this.memoryDb = openMemoryDatabase({
+      memoryRoot: this.memoryRoot
+    });
     this.repoId = sha1(this.rootDir);
     this.sessionId = options.sessionId ?? makeId("session", `${Date.now()}:${randomUUID()}`);
     this.coreInstructions = options.coreInstructions ?? "Use exact lookup before broad reads. Compress only safe artifact classes.";
@@ -159,6 +184,8 @@ export class ContextForge {
     this._closed = true;
     this._watcher?.close?.();
     this._watcher = null;
+    this._maybeAutosaveMemory(true);
+    this.memoryDb.close();
     this.db.close();
   }
 
@@ -187,7 +214,7 @@ export class ContextForge {
         batchCount: Math.max(1, Math.ceil(inventory.files.length / batchSize))
       };
       this._registerIndexedRepo(reusedSummary);
-      recordSessionEvent(this.db, {
+      this._recordSessionEvent({
         repoId: this.repoId,
         sessionId: this.sessionId,
         eventType: "index_reuse",
@@ -219,7 +246,7 @@ export class ContextForge {
       limit: options.limit ?? 10
     });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "search",
@@ -326,6 +353,207 @@ export class ContextForge {
 
   resume() {
     return buildResumeSummary(this.db, { repoId: this.repoId, sessionId: this.sessionId });
+  }
+
+  memoryStatus() {
+    return buildMemoryStatus(this.memoryDb, {
+      repoId: this.repoId,
+      repoName: this._repoDisplayName(),
+      sessionId: this.sessionId
+    });
+  }
+
+  memoryWakeup(options: Record<string, any> = {}) {
+    return buildMemoryWakeup(this.memoryDb, {
+      repoId: this.repoId,
+      repoName: this._repoDisplayName(),
+      sessionId: this.sessionId,
+      includeProtocol: coerceBoolean(options.includeProtocol, true)
+    });
+  }
+
+  memoryRecall(query = "", options: Record<string, any> = {}) {
+    return buildMemoryRecall(this.memoryDb, {
+      query,
+      repoId: this.repoId,
+      repoName: this._repoDisplayName(),
+      wing: options.wing,
+      hall: options.hall,
+      room: options.room,
+      limit: options.limit
+    });
+  }
+
+  memorySearch(query = "", options: Record<string, any> = {}) {
+    return searchMemory(this.memoryDb, {
+      query,
+      repoId: coerceBoolean(options.global, false) ? null : this.repoId,
+      wing: options.wing,
+      hall: options.hall,
+      room: options.room,
+      limit: options.limit,
+      asOf: options.asOf,
+      includeDiaries: options.includeDiaries == null ? true : coerceBoolean(options.includeDiaries, true)
+    });
+  }
+
+  memorySave(input: Record<string, any> = {}) {
+    const entry = storeMemoryEntry(this.memoryDb, {
+      scope: input.scope ?? "repo",
+      repoId: coerceBoolean(input.global, false) ? null : this.repoId,
+      sessionId: this.sessionId,
+      wing: input.wing ?? this._repoDisplayName(),
+      hall: input.hall ?? "discoveries",
+      room: input.room,
+      title: input.title ?? "Saved memory",
+      summary: input.summary ?? "",
+      detail: input.detail ?? input.summary ?? "",
+      aaak: input.aaak ?? null,
+      tags: normalizeStringArray(input.tags),
+      importance: input.importance ?? 0.6,
+      sourceType: input.sourceType ?? "manual",
+      sourceRef: input.sourceRef ?? null,
+      entities: normalizeStringArray(input.entities)
+    });
+    this._recordSessionEvent({
+      eventType: "memory_save",
+      payload: {
+        title: entry?.title ?? input.title ?? "Saved memory",
+        hall: entry?.hall ?? input.hall ?? "discoveries",
+        wing: entry?.wing ?? this._repoDisplayName(),
+        entryId: entry?.entryId ?? null
+      }
+    });
+    return {
+      saved: true,
+      entry
+    };
+  }
+
+  memoryProfileSet(input: Record<string, any> = {}) {
+    const profileType = this._normalizeMemoryProfileType(input.profileType);
+    const profile = ensureMemoryProfile(this.memoryDb, {
+      profileType,
+      name: input.name ?? this._repoDisplayName(),
+      summary: input.summary ?? "",
+      aaak: input.aaak ?? null,
+      metadata: input.metadata ?? {}
+    });
+    this._recordSessionEvent({
+      eventType: "memory_profile_set",
+      payload: {
+        profileType,
+        name: profile?.name ?? null
+      }
+    });
+    return profile;
+  }
+
+  memoryProfileGet(profileType = "identity") {
+    const normalizedProfileType = this._normalizeMemoryProfileType(profileType);
+    return {
+      profile: normalizedProfileType === "list" ? null : getMemoryProfile(this.memoryDb, normalizedProfileType),
+      profiles: normalizedProfileType === "list" ? listMemoryProfiles(this.memoryDb) : undefined
+    };
+  }
+
+  memoryDiaryWrite(input: Record<string, any> = {}) {
+    const diary = storeDiaryEntry(this.memoryDb, {
+      agentId: input.agentId ?? "claude",
+      repoId: coerceBoolean(input.global, false) ? null : this.repoId,
+      sessionId: this.sessionId,
+      title: input.title ?? "Session diary",
+      entryText: input.entryText ?? input.summary ?? "",
+      aaak: input.aaak ?? null,
+      tags: normalizeStringArray(input.tags)
+    });
+    this._recordSessionEvent({
+      eventType: "memory_diary_write",
+      payload: {
+        title: diary?.title ?? input.title ?? "Session diary",
+        diaryId: diary?.diaryId ?? null
+      }
+    });
+    return diary;
+  }
+
+  memoryDiaryRead(options: Record<string, any> = {}) {
+    const entries = readDiaryEntries(this.memoryDb, {
+      agentId: options.agentId,
+      repoId: coerceBoolean(options.global, false) ? null : this.repoId,
+      sessionId: options.sessionOnly ? this.sessionId : options.sessionId,
+      limit: options.limit
+    });
+    return {
+      entries,
+      summary: `Loaded ${entries.length} diar${entries.length === 1 ? "y entry" : "y entries"}.`
+    };
+  }
+
+  memoryFactAdd(input: Record<string, any> = {}) {
+    const fact = addMemoryFact(this.memoryDb, {
+      subject: input.subject,
+      predicate: input.predicate,
+      object: input.object,
+      repoId: coerceBoolean(input.global, false) ? null : this.repoId,
+      sessionId: this.sessionId,
+      sourceEntryId: input.sourceEntryId ?? null,
+      sourceKind: input.sourceKind ?? "manual",
+      validFrom: input.validFrom ?? null,
+      validTo: input.validTo ?? null,
+      confidence: input.confidence ?? 0.85,
+      metadata: input.metadata ?? {}
+    });
+    this._recordSessionEvent({
+      eventType: "memory_fact_add",
+      payload: {
+        subject: fact?.subject ?? input.subject ?? null,
+        predicate: fact?.predicate ?? input.predicate ?? null,
+        object: fact?.object ?? input.object ?? null
+      }
+    });
+    return fact;
+  }
+
+  memoryFactInvalidate(input: Record<string, any> = {}) {
+    const result = invalidateMemoryFact(this.memoryDb, {
+      subject: input.subject,
+      predicate: input.predicate,
+      object: input.object,
+      ended: input.ended
+    });
+    this._recordSessionEvent({
+      eventType: "memory_fact_invalidate",
+      payload: {
+        subject: input.subject ?? null,
+        predicate: input.predicate ?? null,
+        object: input.object ?? null,
+        invalidated: result.invalidated ?? 0
+      }
+    });
+    return result;
+  }
+
+  memoryFactQuery(entity = "", options: Record<string, any> = {}) {
+    const facts = queryMemoryFacts(this.memoryDb, {
+      entity,
+      asOf: options.asOf,
+      direction: options.direction ?? "both"
+    });
+    return {
+      entity,
+      facts,
+      summary: `Loaded ${facts.length} fact${facts.length === 1 ? "" : "s"} for ${entity}.`
+    };
+  }
+
+  memoryTimeline(entity = "") {
+    const events = loadMemoryTimeline(this.memoryDb, entity || null);
+    return {
+      entity: entity || null,
+      events,
+      summary: `Loaded ${events.length} timeline event${events.length === 1 ? "" : "s"}.`
+    };
   }
 
   async processArtifact(content: string, metadata: Record<string, any> = {}) {
@@ -443,7 +671,7 @@ export class ContextForge {
       }
     }
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "startup",
@@ -461,6 +689,12 @@ export class ContextForge {
     return {
       index,
       task,
+      memory: {
+        enabled: true,
+        repoName: this._repoDisplayName(),
+        counts: getMemoryStats(this.memoryDb, this.repoId),
+        recommendedNextTool: "forge_memory_wakeup"
+      },
       pagePersistence,
       layout: cacheLayout({
         coreInstructions: this.startupBrief,
@@ -477,6 +711,19 @@ export class ContextForge {
     return [
       "forge_tools",
       "forge_start",
+      "forge_memory_status",
+      "forge_memory_wakeup",
+      "forge_memory_recall",
+      "forge_memory_search",
+      "forge_memory_save",
+      "forge_memory_profile_set",
+      "forge_memory_profile_get",
+      "forge_memory_diary_write",
+      "forge_memory_diary_read",
+      "forge_memory_fact_add",
+      "forge_memory_fact_invalidate",
+      "forge_memory_fact_query",
+      "forge_memory_timeline",
       "forge_batch",
       "forge_lookup",
       "forge_scan",
@@ -597,7 +844,7 @@ export class ContextForge {
         })
       : [];
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "research_batch",
@@ -638,7 +885,7 @@ export class ContextForge {
       limit
     });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "research_lookup",
@@ -670,7 +917,7 @@ export class ContextForge {
       importantFiles: overview.importantFiles
     });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "understand",
@@ -750,7 +997,7 @@ export class ContextForge {
       exhaustive
     });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "walk",
@@ -846,7 +1093,7 @@ export class ContextForge {
 
     if (stat.isDirectory()) {
       const entries = this._listDirectoryEntries(resolved, options.limit);
-      recordSessionEvent(this.db, {
+      this._recordSessionEvent({
         repoId: this.repoId,
         sessionId: this.sessionId,
         eventType: "read_directory",
@@ -876,7 +1123,7 @@ export class ContextForge {
     const excerpt = formatNumberedLines(excerptLines, requestedStart, requestedEnd);
     const truncated = requestedStart > 1 || requestedEnd < totalLines;
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "read_file",
@@ -911,7 +1158,7 @@ export class ContextForge {
     writeText(resolved, String(content ?? ""));
     const indexSync = this._syncChangedPaths([relativePath], { reason: "write" });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: existed ? "write_file" : "create_file",
@@ -962,7 +1209,7 @@ export class ContextForge {
       maxLines: 10
     });
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "edit_file",
@@ -1013,7 +1260,7 @@ export class ContextForge {
         })
       : null;
 
-    recordSessionEvent(this.db, {
+    this._recordSessionEvent({
       repoId: this.repoId,
       sessionId: this.sessionId,
       eventType: "command",
@@ -1125,8 +1372,10 @@ export class ContextForge {
       : 0;
     const researchSourceCount = this.db.prepare(`SELECT COUNT(*) AS count FROM research_sources WHERE repo_id = ?`).get(this.repoId).count;
     const researchSectionCount = this.db.prepare(`SELECT COUNT(*) AS count FROM research_sections WHERE repo_id = ?`).get(this.repoId).count;
+    const memory = getMemoryStats(this.memoryDb, this.repoId);
     return {
       rootDir: this.rootDir,
+      memoryRoot: this.memoryRoot,
       repoId: this.repoId,
       sessionId: this.sessionId,
       indexed,
@@ -1139,6 +1388,7 @@ export class ContextForge {
       parseFailures,
       researchSourceCount,
       researchSectionCount,
+      memory,
       dirtyPathCount: watcherAvailable ? this._dirtyPaths.size : null,
       inventoryDirty: watcherAvailable ? this._inventoryDirty : null,
       embeddingModel: MODEL_METADATA.embeddings.default,
@@ -1188,6 +1438,7 @@ export class ContextForge {
           AND source_id IN (SELECT source_id FROM research_sources WHERE repo_id = ? AND session_id = ?)
       `).get(this.repoId, this.repoId, this.sessionId).count
     };
+    const memory = getMemoryStats(this.memoryDb, this.repoId);
     return {
       compression,
       deliverySavings: {
@@ -1199,6 +1450,7 @@ export class ContextForge {
       retrieval,
       session,
       research,
+      memory,
       pager: this.pageState()
     };
   }
@@ -1256,6 +1508,70 @@ export class ContextForge {
       deliveredTokenEstimate,
       savedTokenEstimate
     };
+  }
+
+  _recordSessionEvent(event: Record<string, any> = {}) {
+    const recorded = recordSessionEvent(this.db, {
+      repoId: this.repoId,
+      sessionId: this.sessionId,
+      ...event
+    });
+
+    const eventType = String(event.eventType ?? "");
+    if (!recorded || SYSTEM_EVENT_TYPES.has(eventType) || eventType === "read_file" || eventType === "read_directory") {
+      return recorded;
+    }
+
+    this._maybeAutosaveMemory();
+    return recorded;
+  }
+
+  _normalizeMemoryProfileType(profileType: any) {
+    const normalized = String(profileType ?? "identity").trim() || "identity";
+    if (normalized === "project") {
+      return `project:${this._repoDisplayName()}`;
+    }
+    return normalized;
+  }
+
+  _maybeAutosaveMemory(force = false) {
+    try {
+      const latest = getLatestMemoryCheckpoint(this.memoryDb, {
+        repoId: this.repoId,
+        sessionId: this.sessionId,
+        kind: "autosave"
+      });
+      const candidate = buildSessionCheckpointCandidate(listSessionEvents(this.db, this.sessionId, this.repoId), {
+        repoId: this.repoId,
+        repoName: this._repoDisplayName(),
+        sessionId: this.sessionId,
+        lastCheckpointAt: latest?.lastEventAt ?? 0,
+        force
+      });
+      if (!candidate) {
+        return null;
+      }
+
+      const entry = storeMemoryEntry(this.memoryDb, candidate);
+      const diary = storeDiaryEntry(this.memoryDb, buildDiaryFromCheckpoint(candidate));
+      const checkpoint = recordMemoryCheckpoint(this.memoryDb, {
+        repoId: this.repoId,
+        sessionId: this.sessionId,
+        kind: "autosave",
+        lastEventId: candidate.lastEventId,
+        lastEventAt: candidate.lastEventAt,
+        entryId: entry?.entryId ?? null
+      });
+
+      return {
+        entryId: entry?.entryId ?? null,
+        diaryId: diary?.diaryId ?? null,
+        checkpointId: checkpoint.checkpointId,
+        eventCount: candidate.eventCount
+      };
+    } catch {
+      return null;
+    }
   }
 
   areas(query = "") {
@@ -1568,7 +1884,10 @@ export class ContextForge {
         });
         continue;
       }
-      const nested = createContextForge(resolvedRepo.rootPath, { sessionId: this.sessionId });
+      const nested = createContextForge(resolvedRepo.rootPath, {
+        sessionId: this.sessionId,
+        memoryRoot: this.memoryRoot
+      });
       try {
         const matches = nested.search(query, { limit });
         results.push({
@@ -1609,7 +1928,10 @@ export class ContextForge {
           }
         };
       }
-      const nested = createContextForge(resolvedRepo.rootPath, { sessionId: this.sessionId });
+      const nested = createContextForge(resolvedRepo.rootPath, {
+        sessionId: this.sessionId,
+        memoryRoot: this.memoryRoot
+      });
       try {
         const row = nested._readRepositoryRow();
         const counts = nested._repoCounts();
@@ -2646,7 +2968,7 @@ export class ContextForge {
       this._quickRepoStamp = quickRepoStamp;
       this._ensureWatcher();
 
-      recordSessionEvent(this.db, {
+      this._recordSessionEvent({
         repoId: this.repoId,
         sessionId: this.sessionId,
         eventType: "index",
@@ -3193,7 +3515,7 @@ export class ContextForge {
       };
 
       this._registerIndexedRepo(resumedSummary);
-      recordSessionEvent(this.db, {
+      this._recordSessionEvent({
         repoId: this.repoId,
         sessionId: this.sessionId,
         eventType: "derive_resume",

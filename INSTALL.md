@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.50`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.51`.
 
 ## What This Guide Covers
 
@@ -83,9 +83,11 @@ Runtime behavior:
 - repo-changing `forge_bash` flows sync the index after mutations and reuse watcher-tracked changed paths when available
 - `forge_batch` can run multi-command shell research, store the full output locally in ContextForge's indexed research store, and return only a compact receipt plus query hits
 - `forge_lookup` can search stored research outputs later without replaying raw logs, test output, diffs, or command output into chat
+- ContextForge now keeps a separate durable memory store under `~/.contextforge/memory/` for wake-up capsules, profiles, diaries, and temporal facts across sessions
+- meaningful session activity can autosave into that memory layer as checkpoints so later sessions can resume from durable recall instead of only ephemeral chat history
 - broad repo-crawl attempts through built-in `Agent`, `Task`, `Bash`, `Read`, or `Grep` are now steered back toward compact ContextForge discovery flows first
 - project installs seed `.claude/settings.local.json` with the safe read/search-style ContextForge allowlist so `dontAsk` mode does not hard-deny repo-understanding tools
-  Mutation and shell tools stay opt-in. The default install keeps `forge_write`, `forge_edit`, and `forge_bash` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
+  Mutation and shell tools stay opt-in. The default install keeps `forge_write`, `forge_edit`, `forge_bash`, and persistent memory-write tools like `forge_memory_save`, `forge_memory_diary_write`, and `forge_memory_fact_add` out of the pre-approved set unless you pass `--allow-mutations`, and it only seeds `dontAsk` when you pass `--dont-ask`.
 
 ## 3. Claude Code Chat Commands
 
@@ -93,6 +95,19 @@ ContextForge exposes these user-invocable commands:
 
 ```text
 /contextforge:contextforge [request]
+/contextforge:forge-memory-status
+/contextforge:forge-memory-wakeup
+/contextforge:forge-memory-recall [query]
+/contextforge:forge-memory-search [query]
+/contextforge:forge-memory-save [note]
+/contextforge:forge-memory-profile-set [profile]
+/contextforge:forge-memory-profile-get [profile type]
+/contextforge:forge-memory-diary-write [note]
+/contextforge:forge-memory-diary-read
+/contextforge:forge-memory-fact-add [fact]
+/contextforge:forge-memory-fact-invalidate [fact]
+/contextforge:forge-memory-fact-query [entity]
+/contextforge:forge-memory-timeline [entity]
 /contextforge:forge-understand [request]
 /contextforge:forge-walk [request]
 /contextforge:forge-read [path]
@@ -110,6 +125,8 @@ Recommended command map:
 
 - `/contextforge:forge-understand` for fast repo orientation
 - `/contextforge:forge-walk` for deeper package-by-package or folder-by-folder walkthroughs
+- `/contextforge:forge-memory-wakeup` or `/contextforge:forge-memory-status` before assuming prior decisions or project history
+- `forge_memory_save`, `forge_memory_diary_write`, and the fact tools for durable long-term memory
 - `forge_batch` for shell-heavy research and large command output you do not want dumped into chat
 - `forge_lookup` for follow-up questions against stored research output
 - `/contextforge:forge-read` for compact file excerpts or directory listings

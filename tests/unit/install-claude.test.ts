@@ -64,10 +64,16 @@ test("installClaudeCodeProject creates or merges a Claude Code mcp config", () =
   assert.ok(settings.permissions.allow.includes("mcp__contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_start"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_walk"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_status"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_wakeup"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_batch"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
   assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_save"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_profile_set"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_diary_write"));
+  assert.ok(!settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_fact_add"));
 });
 
 test("installClaudeCodeProject can opt into mutation approvals and dontAsk mode", () => {
@@ -86,6 +92,10 @@ test("installClaudeCodeProject can opt into mutation approvals and dontAsk mode"
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_bash"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_write"));
   assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_edit"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_save"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_profile_set"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_diary_write"));
+  assert.ok(settings.permissions.allow.includes("mcp__plugin_contextforge_contextforge__forge_memory_fact_add"));
 });
 
 test("mergeClaudeCodePermissions preserves existing project-local Claude settings", () => {

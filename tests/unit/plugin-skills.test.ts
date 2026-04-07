@@ -6,6 +6,19 @@ import path from "node:path";
 const skillNames = [
   "contextforge",
   "forge-start",
+  "forge-memory-status",
+  "forge-memory-wakeup",
+  "forge-memory-recall",
+  "forge-memory-search",
+  "forge-memory-save",
+  "forge-memory-profile-set",
+  "forge-memory-profile-get",
+  "forge-memory-diary-write",
+  "forge-memory-diary-read",
+  "forge-memory-fact-add",
+  "forge-memory-fact-invalidate",
+  "forge-memory-fact-query",
+  "forge-memory-timeline",
   "forge-scan",
   "forge-understand",
   "forge-walk",
@@ -74,4 +87,9 @@ test("contextforge router skill covers why, changes, rename, and research prompt
   assert.match(body, /forge_list_repos/);
   assert.match(body, /forge_group_query/);
   assert.match(body, /forge_group_status/);
+  assert.match(body, /forge_memory_status/);
+  assert.match(body, /forge_memory_wakeup/);
+  assert.match(body, /forge_memory_search/);
+  assert.match(body, /forge_memory_fact_query/);
+  assert.match(body, /forge_memory_timeline/);
 });

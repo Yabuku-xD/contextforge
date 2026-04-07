@@ -1,13 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
 
 import { createContextForge } from "../../src/contextforge.js";
 
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
+const memoryRoot = path.join(os.tmpdir(), "contextforge-memory-tests", "pdg");
+fs.mkdirSync(memoryRoot, { recursive: true });
 
 test("PDG import and call edges resolve real symbols in the sample app", () => {
-  const forge = createContextForge(sampleRepo, { sessionId: "pdg_unit" });
+  const forge = createContextForge(sampleRepo, { sessionId: "pdg_unit", memoryRoot });
   try {
     forge.indexRepository();
     const edges = forge._loadEdges();

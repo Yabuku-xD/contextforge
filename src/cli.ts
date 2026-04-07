@@ -131,6 +131,111 @@ async function main(argv) {
     return;
   }
 
+  if ([
+    "memory-status",
+    "memory-wakeup",
+    "memory-recall",
+    "memory-search",
+    "memory-save",
+    "memory-profile-set",
+    "memory-profile-get",
+    "memory-diary-write",
+    "memory-diary-read",
+    "memory-fact-add",
+    "memory-fact-invalidate",
+    "memory-fact-query",
+    "memory-timeline"
+  ].includes(command)) {
+    const commandRoot = path.resolve(
+      command === "memory-status" || command === "memory-wakeup" || command === "memory-diary-read"
+        ? (rest[0] ?? process.cwd())
+        : command === "memory-profile-get"
+          ? (rest[1] ?? process.cwd())
+          : command === "memory-profile-set"
+            ? (rest[3] ?? process.cwd())
+            : command === "memory-save"
+              ? (rest[3] ?? process.cwd())
+              : command === "memory-diary-write"
+                ? (rest[2] ?? process.cwd())
+                : command === "memory-fact-add"
+                  ? (rest[3] ?? process.cwd())
+                  : command === "memory-fact-invalidate"
+                    ? (rest[4] ?? process.cwd())
+                    : command === "memory-fact-query"
+                      ? (rest[1] ?? process.cwd())
+                      : command === "memory-timeline"
+                        ? (rest[1] ?? process.cwd())
+                        : (rest[1] ?? process.cwd())
+    );
+    const forge = createContextForge(commandRoot);
+    try {
+      switch (command) {
+        case "memory-status":
+          console.log(JSON.stringify(forge.memoryStatus(), null, 2));
+          break;
+        case "memory-wakeup":
+          console.log(JSON.stringify(forge.memoryWakeup(), null, 2));
+          break;
+        case "memory-recall":
+          console.log(JSON.stringify(forge.memoryRecall(rest[0] ?? ""), null, 2));
+          break;
+        case "memory-search":
+          console.log(JSON.stringify(forge.memorySearch(rest[0] ?? ""), null, 2));
+          break;
+        case "memory-save":
+          console.log(JSON.stringify(forge.memorySave({
+            title: rest[0] ?? "Saved memory",
+            summary: rest[1] ?? "",
+            detail: rest[2] ?? ""
+          }), null, 2));
+          break;
+        case "memory-profile-set":
+          console.log(JSON.stringify(forge.memoryProfileSet({
+            profileType: rest[0] ?? "identity",
+            name: rest[1] ?? "ContextForge",
+            summary: rest[2] ?? ""
+          }), null, 2));
+          break;
+        case "memory-profile-get":
+          console.log(JSON.stringify(forge.memoryProfileGet(rest[0] ?? "identity"), null, 2));
+          break;
+        case "memory-diary-write":
+          console.log(JSON.stringify(forge.memoryDiaryWrite({
+            title: rest[0] ?? "Session diary",
+            entryText: rest[1] ?? ""
+          }), null, 2));
+          break;
+        case "memory-diary-read":
+          console.log(JSON.stringify(forge.memoryDiaryRead(), null, 2));
+          break;
+        case "memory-fact-add":
+          console.log(JSON.stringify(forge.memoryFactAdd({
+            subject: rest[0] ?? "",
+            predicate: rest[1] ?? "",
+            object: rest[2] ?? ""
+          }), null, 2));
+          break;
+        case "memory-fact-invalidate":
+          console.log(JSON.stringify(forge.memoryFactInvalidate({
+            subject: rest[0] ?? "",
+            predicate: rest[1] ?? "",
+            object: rest[2] ?? "",
+            ended: rest[3] ?? null
+          }), null, 2));
+          break;
+        case "memory-fact-query":
+          console.log(JSON.stringify(forge.memoryFactQuery(rest[0] ?? ""), null, 2));
+          break;
+        case "memory-timeline":
+          console.log(JSON.stringify(forge.memoryTimeline(rest[0] ?? ""), null, 2));
+          break;
+      }
+    } finally {
+      forge.close();
+    }
+    return;
+  }
+
   if (command === "validate-report") {
     const filePath = rest[0];
     if (!filePath) {

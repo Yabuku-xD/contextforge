@@ -12,3 +12,21 @@ export function redactSecrets(value): string {
   }
   return text;
 }
+
+export function redactSecretsDeep(value: any): any {
+  if (typeof value === "string") {
+    return redactSecrets(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSecretsDeep(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactSecretsDeep(item)])
+    );
+  }
+
+  return value;
+}

@@ -19,9 +19,9 @@ const SERVER_INFO = {
 };
 
 const SERVER_INSTRUCTIONS = [
-  "ContextForge is a Claude-first code-context server for repository search, architecture lookup, impact analysis, and session continuity.",
+  "ContextForge is a Claude-first code-context server for repository search, architecture lookup, impact analysis, session continuity, and durable layered memory.",
   "Use forge_start near the beginning of non-trivial tasks to establish paging and session state. On large repositories, forge_start may queue the eager full-repository prime in the background and return immediately; that is not a failure.",
-  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first and stop calling follow-up tools for the initial response. Do not call forge_read, forge_batch, forge_lookup, forge_search, or built-in Read/Bash/Grep after a successful exhaustive walk unless the user explicitly asks for drilldown or the audit says coverage is incomplete. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 160 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents or manually read representative files for the initial whole-repo answer unless the user explicitly asks for a drilldown. For shell-heavy research, logs, diffs, test output, or multi-command discovery, prefer forge_batch first and use forge_lookup for follow-up questions so raw output stays in ContextForge's local research index instead of flooding chat. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Prefer forge_why for prompts like `why does this file matter`, `what is this for`, or `why is this important`; forge_impact for `what breaks if I change X`; forge_changes for `what changed on this branch` or `summarize the diff`; forge_rename for rename requests; forge_symbol for `where is function/class X`; forge_search for `find where behavior Y is implemented`; forge_scope for `how is this area structured`; forge_map, forge_contracts, or forge_wiki for generated architecture artifacts; forge_resume or forge_session for continuity; and forge_list_repos, forge_group_query, or forge_group_status for multi-repo registry work. Read ContextForge resources when you need structured overviews of the repo, areas, flows, schema, groups, or generated artifacts."
+  "Use forge_scan, forge_understand, or forge_walk first for broad prompts like understanding the whole repo or monorepo, going through every file or folder, mapping packages, or finding important files. forge_scan is the fastest first-pass repo map. forge_understand auto-escalates for exhaustive prompts, and forge_walk now performs a local full-repository audit for explicit every-file requests before returning a compact receipt-style digest. If forge_walk returns exhaustive_walk, treat it as authoritative: answer from it first and stop calling follow-up tools for the initial response. Do not call forge_read, forge_batch, forge_lookup, forge_search, or built-in Read/Bash/Grep after a successful exhaustive walk unless the user explicitly asks for drilldown or the audit says coverage is incomplete. If the user asks whether every file, the whole project, or every corner was read, answer yes only when audit.readCoverage.openedEveryRepositoryFile is true. If the user asks whether ContextForge fully remembers the repo in indexed memory, answer yes only when audit.indexedMemory.complete is true; otherwise say the local audit is complete but persistent indexed memory is still warming or deriving. Do not imply that every source line is sitting verbatim in active chat memory. For broad repo answers, keep the first response concise: prefer a short coverage verdict plus top-level architecture, major areas, and key entrypoints, ideally under 160 words. Avoid tables or long per-package expansions unless the user explicitly asks for more detail. Do not spawn Explore agents or manually read representative files for the initial whole-repo answer unless the user explicitly asks for a drilldown. For shell-heavy research, logs, diffs, test output, or multi-command discovery, prefer forge_batch first and use forge_lookup for follow-up questions so raw output stays in ContextForge's local research index instead of flooding chat. For compact file and shell operations inside the current repository, prefer forge_read, forge_write, forge_edit, and forge_bash over heavier built-in tool paths when they are sufficient. Before guessing about prior decisions, identity, preferences, or project history, load forge_memory_wakeup or forge_memory_status. Use forge_memory_search or forge_memory_fact_query to verify remembered facts. Use forge_memory_save, forge_memory_diary_write, and forge_memory_fact_add to store durable decisions, diaries, and temporal facts. Prefer forge_why for prompts like `why does this file matter`, `what is this for`, or `why is this important`; forge_impact for `what breaks if I change X`; forge_changes for `what changed on this branch` or `summarize the diff`; forge_rename for rename requests; forge_symbol for `where is function/class X`; forge_search for `find where behavior Y is implemented`; forge_scope for `how is this area structured`; forge_map, forge_contracts, or forge_wiki for generated architecture artifacts; forge_resume or forge_session for continuity; and forge_list_repos, forge_group_query, or forge_group_status for multi-repo registry work. Read ContextForge resources when you need structured overviews of the repo, areas, flows, schema, groups, generated artifacts, or memory layers."
 ].join(" ");
 
 export async function startMcpServer(argv = process.argv.slice(2)): Promise<void> {
@@ -31,7 +31,10 @@ export async function startMcpServer(argv = process.argv.slice(2)): Promise<void
     sessionId: config.sessionId,
     preferActive: config.useActiveSession
   });
-  const forge = createContextForge(rootDir, resolvedSessionId ? { sessionId: resolvedSessionId } : {});
+  const forge = createContextForge(rootDir, {
+    ...(resolvedSessionId ? { sessionId: resolvedSessionId } : {}),
+    ...(config.memoryRoot ? { memoryRoot: config.memoryRoot } : {})
+  });
 
   if (config.rememberSession) {
     rememberActiveSession(rootDir, forge.sessionId, {
@@ -92,6 +95,7 @@ export async function startMcpServer(argv = process.argv.slice(2)): Promise<void
 function parseServerArgs(args) {
   const config = {
     rootDir: process.env.CONTEXTFORGE_ROOT ?? null,
+    memoryRoot: process.env.CONTEXTFORGE_MEMORY_ROOT ?? null,
     sessionId: process.env.CONTEXTFORGE_SESSION_ID ?? null,
     useActiveSession: truthy(process.env.CONTEXTFORGE_USE_ACTIVE_SESSION),
     rememberSession: process.env.CONTEXTFORGE_REMEMBER_SESSION == null
@@ -115,6 +119,17 @@ function parseServerArgs(args) {
     if (value === "--session-id") {
       config.sessionId = args[index + 1] ?? config.sessionId;
       index += 1;
+      continue;
+    }
+
+    if (value === "--memory-root") {
+      config.memoryRoot = args[index + 1] ?? config.memoryRoot;
+      index += 1;
+      continue;
+    }
+
+    if (value.startsWith("--memory-root=")) {
+      config.memoryRoot = value.slice("--memory-root=".length);
       continue;
     }
 

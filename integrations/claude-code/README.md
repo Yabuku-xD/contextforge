@@ -52,6 +52,9 @@ Once installed, Claude Code can also invoke ContextForge through chat commands:
 
 ```text
 /contextforge:forge-understand [request]
+/contextforge:forge-memory-wakeup
+/contextforge:forge-memory-search [query]
+/contextforge:forge-memory-save [note]
 /contextforge:forge-walk [request]
 /contextforge:forge-read [path]
 /contextforge:forge-write [instruction]
@@ -63,3 +66,9 @@ Once installed, Claude Code can also invoke ContextForge through chat commands:
 /contextforge:forge-doctor
 /contextforge:forge-edit [change request]
 ```
+
+Use the memory commands when you want durable recall across sessions:
+
+- `/contextforge:forge-memory-wakeup` before continuing prior work or assuming remembered context
+- `/contextforge:forge-memory-search` to verify remembered notes or past decisions
+- `/contextforge:forge-memory-save` to store a durable decision, discovery, or preference
