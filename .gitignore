@@ -6,10 +6,7 @@ dist/
 .claude/agents/
 .claude/commands/
 .claude/hooks/
+.claude/modules/
 .claude/settings.json
 .claude/settings.local.json
 .DS_Store
-.agents/
-.trellis/
-.opencode/
-AGENTS.md

@@ -1,7 +1,7 @@
 <a id="install"></a>
 # ContextForge Installation Guide
 
-> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.48`.
+> Installation, runtime behavior, chat commands, native file operations, and deployment notes for `contextforge@0.1.50`.
 
 ## What This Guide Covers
 
@@ -131,7 +131,7 @@ ContextForge now includes its own compact repo operations:
 - `forge_bash`
   Runs shell commands in the repository with summary-first output and compact stdout/stderr previews.
 
-If you want Claude to prefer these over heavier built-in tool paths, tell it in your repository instructions or `AGENTS.md`.
+If you want Claude to prefer these over heavier built-in tool paths, tell it in your repository instructions such as `CLAUDE.md`.
 
 ## 5. Local Development Install
 

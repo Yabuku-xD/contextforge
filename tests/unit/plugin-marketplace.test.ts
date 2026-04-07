@@ -5,6 +5,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+function writableTempBase() {
+  const candidates = [os.tmpdir(), path.resolve(".tmp-tests")];
+  for (const candidate of candidates) {
+    try {
+      fs.mkdirSync(candidate, { recursive: true });
+      fs.accessSync(candidate, fs.constants.W_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("No writable temp directory available for marketplace tests.");
+}
+
 test("claude plugin marketplace metadata is present and points at the versioned github launcher", () => {
   const marketplace = JSON.parse(fs.readFileSync(".claude-plugin/marketplace.json", "utf8"));
   const plugin = JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8"));
@@ -35,8 +49,9 @@ test("inline marketplace launcher resolves the cached bootstrap outside the targ
   const plugin = JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8"));
   const mcp = JSON.parse(fs.readFileSync(".claude-plugin/mcp.json", "utf8"));
   const launcher = mcp.mcpServers.contextforge.args[1];
-  const repoCwd = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-launcher-cwd-"));
-  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-launcher-runtime-"));
+  const tempBase = writableTempBase();
+  const repoCwd = fs.mkdtempSync(path.join(tempBase, "contextforge-launcher-cwd-"));
+  const runtimeRoot = fs.mkdtempSync(path.join(tempBase, "contextforge-launcher-runtime-"));
 
   const childEnv = { ...process.env };
   delete childEnv.CLAUDE_PLUGIN_ROOT;

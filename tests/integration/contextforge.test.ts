@@ -13,13 +13,30 @@ import { startBridgeServer } from "../../src/server/bridge.js";
 const sampleRepo = path.resolve("tests/fixtures/sample-app");
 const repoRoot = path.resolve(".");
 
-function writableTempBase() {
-  const candidates = [os.tmpdir(), path.join(repoRoot, ".tmp-tests")];
+function isWithin(parent: string, child: string) {
+  const relative = path.relative(parent, child);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function writableTempBase(excludeRoot?: string) {
+  const candidates = [
+    os.tmpdir(),
+    path.join(path.dirname(repoRoot), ".tmp-tests"),
+    path.join(os.homedir(), ".contextforge-test-tmp"),
+    path.resolve(".tmp-tests"),
+    path.join(repoRoot, ".tmp-tests")
+  ];
+  const blockedRoot = excludeRoot ? path.resolve(excludeRoot) : null;
   for (const candidate of candidates) {
     try {
-      fs.mkdirSync(candidate, { recursive: true });
-      fs.accessSync(candidate, fs.constants.W_OK);
-      return candidate;
+      const resolved = path.resolve(candidate);
+      if (blockedRoot && isWithin(blockedRoot, resolved)) {
+        continue;
+      }
+
+      fs.mkdirSync(resolved, { recursive: true });
+      fs.accessSync(resolved, fs.constants.W_OK);
+      return resolved;
     } catch {
       continue;
     }
@@ -66,7 +83,7 @@ test("Phase 1 can index, search, analyze impact, and resume", async () => {
 });
 
 test("ContextForge can index and understand the repository hosting itself", async () => {
-  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(), "contextforge-self-hosted-"));
+  const tempRoot = fs.mkdtempSync(path.join(writableTempBase(repoRoot), "contextforge-self-hosted-"));
   fs.cpSync(repoRoot, tempRoot, {
     recursive: true,
     filter(sourcePath) {

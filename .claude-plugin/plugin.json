@@ -1,6 +1,6 @@
 {
   "name": "contextforge",
-  "version": "0.1.48",
+  "version": "0.1.50",
   "description": "Context engine for code agents with hybrid retrieval, architecture lookup, impact analysis, and session memory",
   "author": {
     "name": "Yabuku-xD"
