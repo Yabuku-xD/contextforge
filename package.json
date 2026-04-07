@@ -1,6 +1,6 @@
 {
   "name": "contextforge",
-  "version": "0.1.45",
+  "version": "0.1.46",
   "description": "Claude-first context optimizer for code agents",
   "license": "MIT",
   "homepage": "https://github.com/Yabuku-xD/contextforge",

@@ -38,14 +38,15 @@ test("inline marketplace launcher resolves the cached bootstrap outside the targ
   const repoCwd = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-launcher-cwd-"));
   const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "contextforge-launcher-runtime-"));
 
+  const childEnv = { ...process.env };
+  delete childEnv.CLAUDE_PLUGIN_ROOT;
+  childEnv.CONTEXTFORGE_INLINE_LAUNCHER_MODE = "inspect";
+  childEnv.CONTEXTFORGE_RUNTIME_ROOT = runtimeRoot;
+
   const result = cp.spawnSync(process.execPath, ["-e", launcher, "--"], {
     cwd: repoCwd,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      CONTEXTFORGE_INLINE_LAUNCHER_MODE: "inspect",
-      CONTEXTFORGE_RUNTIME_ROOT: runtimeRoot
-    }
+    env: childEnv
   });
 
   assert.equal(result.status, 0, result.stderr);

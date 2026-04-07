@@ -27,7 +27,7 @@ test("claude plugin hooks register a SessionStart guidance hook", () => {
   const sessionStart = hooks.hooks?.SessionStart?.[0]?.hooks?.[0];
 
   assert.equal(sessionStart?.type, "command");
-  assert.match(sessionStart?.command ?? "", /dist\/hooks\/sessionstart\.js$/);
+  assert.match(sessionStart?.command ?? "", /\.claude-plugin\/hooks\/sessionstart\.cjs$/);
 });
 
 test("claude plugin hooks register PreToolUse routing guards", () => {
@@ -44,7 +44,7 @@ test("claude plugin hooks register PreToolUse routing guards", () => {
   assert.ok(matchers.includes("Task"));
   for (const entry of preToolUse) {
     assert.equal(entry.hooks?.[0]?.type, "command");
-    assert.match(entry.hooks?.[0]?.command ?? "", /dist\/hooks\/pretooluse\.js$/);
+    assert.match(entry.hooks?.[0]?.command ?? "", /\.claude-plugin\/hooks\/pretooluse\.cjs$/);
   }
 });
 
